@@ -1,0 +1,419 @@
+multicontainer
+
+Running Multiple contaier in a pod
+use cases for running multiple cons in a pod
+Init Containers
+SideCar Containers
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+  - name: mypod1
+    ports:
+    image: busybox:latest
+    command: ["sleep"]
+    args: ["3600"]
+    volumeMounts:
+    - name: foo
+      mountPath: "/etc/foo"
+      readOnly: true
+  - name: mypod2
+    image: busybox:latest
+    command: ["sleep"]
+    args: ["3600"]
+    volumeMounts:
+    - name: foo
+      mountPath: "/etc/foo"
+      readOnly: true
+  - name: mypod3
+    image: busybox:latest
+    command: ["sleep"]
+    args: ["3600"]
+    volumeMounts:
+    - name: foo
+      mountPath: "/etc/foo"
+      readOnly: true
+  volumes:
+  - name: foo
+    secret:
+      secretName: mysql-secrets
+----------------------------------------
+1)
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+  - name: mypod1
+    image: busybox:latest
+    command: ["sleep"] #ENTRYPOINT
+    args: ["3600"] #CMD
+
+
+root@ip-172-31-40-54:~# echo 'apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+  - name: mypod1
+    image: busybox:latest
+    command: ["sleep"]
+    args: ["3600"]' | kubectl create -f -
+pod/mypod created
+root@ip-172-31-40-54:~# kubectl get pods
+NAME    READY   STATUS    RESTARTS   AGE
+mypod   1/1     Running   0          5s
+
+----------------------------------------------
+2)
+one pod with multiple container
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+  - name: mypod1
+    image: busybox:latest
+    command: ["sleep"] 
+    args: ["3600"] 
+  - name: mypod2
+    image: busybox:latest
+    command: ["sleep"] 
+    args: ["3600"] 
+  - name: mypod3
+    image: busybox:latest
+    command: ["sleep"] 
+    args: ["3600"]
+
+root@ip-172-31-40-54:~# echo 'apiVersion: v1
+> kind: Pod
+> metadata:
+>   name: mypod
+> spec:
+>   containers:
+>   - name: mypod1
+>     image: busybox:latest
+>     command: ["sleep"]
+>     args: ["3600"]
+>   - name: mypod2
+>     image: busybox:latest
+>     command: ["sleep"]
+>     args: ["3600"]
+>   - name: mypod3
+>     image: busybox:latest
+>     command: ["sleep"]
+>     args: ["3600"]' | kubectl create -f -
+pod/mypod created
+
+
+root@ip-172-31-40-54:~# kubectl get pods
+NAME    READY   STATUS    RESTARTS   AGE
+mypod   3/3     Running   0          50s
+
+
+root@ip-172-31-40-54:~# kubectl describe pod mypod
+
+
+root@ip-172-31-40-54:~# kubectl describe pod mypod
+
+root@ip-172-31-40-54:~# kubectl get pods -o wide
+NAME    READY   STATUS    RESTARTS   AGE     IP           NODE                                          NOMINATED NODE   READINESS GATES
+mypod   3/3     Running   0          3m24s   100.96.2.4   ip-172-20-62-50.ap-south-1.compute.internal   <none>           <none>
+root@ip-172-31-40-54:~#
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: yourpod
+spec:
+  containers:
+  - name: mypod1
+    image: busybox:latest
+    command: ["sleep"] 
+    args: ["3600"] 
+
+
+root@ip-172-31-40-54:~# echo 'apiVersion: v1
+> kind: Pod
+> metadata:
+>   name: yourpod
+> spec:
+>   containers:
+>   - name: mypod1
+>     image: busybox:latest
+>     command: ["sleep"]
+>     args: ["3600"]' | kubectl create -f -
+pod/yourpod created
+root@ip-172-31-40-54:~#
+
+
+root@ip-172-31-40-54:~# kubectl get pods
+NAME      READY   STATUS    RESTARTS   AGE
+mypod     3/3     Running   0          5m58s
+yourpod   1/1     Running   0          28s
+root@ip-172-31-40-54:~# kubectl get pods yourpod -o wide
+NAME      READY   STATUS    RESTARTS   AGE   IP           NODE                                           NOMINATED NODE   READINESS GATES
+yourpod   1/1     Running   0          44s   100.96.1.4   ip-172-20-40-180.ap-south-1.compute.internal   <none>           <none>
+
+
+root@ip-172-31-40-54:~# kubectl logs yourpod
+
+root@ip-172-31-40-54:~# kubectl logs mypod -c mypod1
+root@ip-172-31-40-54:~# kubectl logs mypod -c mypod2
+root@ip-172-31-40-54:~# kubectl logs mypod -c mypod3
+
+
+root@ip-172-31-40-54:~# kubectl exec -it yourpod sh
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+/ #
+inside the pod in container
+
+root@ip-172-31-40-54:~# kubectl exec -it mypod sh
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+Defaulted container "mypod1" out of: mypod1, mypod2, mypod3
+
+
+root@ip-172-31-40-54:~# kubectl exec -it mypod -c mypod2 -- sh
+
+
+root@ip-172-31-40-54:~# kubectl exec -it mypod -c mypod3 -- sh
+
+
+pod have multiple container but maintain single ip address
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+  - name: mypod1
+    image: sreeharshav/rollingupdate:v1
+  - name: mypod2
+    image: sreeharshav/rollingupdate:v1
+  - name: mypod3
+    image: sreeharshav/rollingupdate:v1
+
+apply this
+
+root@ip-172-31-40-54:~# kubectl logs mypod -c mypod2
+2021/09/28 11:58:14 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 11:58:14 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 11:58:14 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 11:58:14 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 11:58:14 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 11:58:14 [emerg] 1#1: still could not bind()
+nginx: [emerg] still could not bind()
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+spec:
+  containers:
+  - name: mypod1
+    image: sreeharshav/rollingupdate:v1
+    ports:
+      - containerPort: 80
+  - name: mypod2
+    image: sreeharshav/rollingupdate:v1
+    ports:
+      - containerPort: 81
+  - name: mypod3
+    image: sreeharshav/rollingupdate:v1
+    ports:
+      - containerPort: 82
+
+root@ip-172-31-40-54:~# kubectl logs mypod -c mypod1
+root@ip-172-31-40-54:~# kubectl logs mypod -c mypod2
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: still could not bind()
+nginx: [emerg] still could not bind()
+root@ip-172-31-40-54:~# kubectl logs mypod -c mypod3
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+2021/09/28 12:13:45 [emerg] 1#1: still could not bind()
+nginx: [emerg] still could not bind()
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: thepod
+spec:
+  containers:
+   - name: mypod1
+     image: sreeharshav/rollingupdate:v1
+     ports:
+       - containerPort: 80 
+  - name: mypod2
+    image: busybox:latest
+    command: ["sleep"] 
+    args: ["3600"] 
+  - name: mypod3
+    image: busybox:latest
+    command: ["sleep"] 
+    args: ["3600"]
+
+
+root@ip-172-31-40-54:~# echo 'apiVersion: v1
+kind: Pod
+metadata:
+  name: thepod
+spec:
+  containers:
+  - name: mypod1
+    image: sreeharshav/rollingupdate:v1
+    ports:
+      - containerPort: 80
+  - name: mypod2
+    image: busybox:latest
+    command: ["sleep"]
+    args: ["3600"]
+  - name: mypod3
+    image: busybox:latest
+    command: ["sleep"]
+    args: ["3600"]' | kubectl create -f -
+pod/thepod created
+
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: superpod
+spec:
+  containers:
+  - name: mypod1
+    image: sreeharshav/rollingupdate:v1
+    ports:
+      - containerPort: 80 
+  - name: mypod2
+    image: busybox:latest
+    command: ["sleep"] 
+    args: ["3600"] 
+  - name: mypod3
+    image: tomcat:9.0
+
+
+root@ip-172-31-40-54:~# kubectl logs superpod -c mypod3
+
+
+logs will shown
+
+
+root@ip-172-31-40-54:~# kubectl label pod superpod app=hello
+pod/superpod labeled
+
+
+root@ip-172-31-40-54:~# kubectl get pods --show-labels
+NAME       READY   STATUS    RESTARTS   AGE     LABELS
+superpod   3/3     Running   0          7m37s   app=hello
+root@ip-172-31-40-54:~# kubectl label pod superpod name=superpod --overwrite
+pod/superpod labeled
+root@ip-172-31-40-54:~# kubectl expose pod superpod --port=8000 --target-port=80 --type=NodePort
+service/superpod exposed
+
+root@ip-172-31-40-54:~# kubectl expose pod superpod --name=tomcat --port=9000 --target-port=8080 --type=NodePort
+service/tomcat exposed
+
+
+172.20.35.37 - - [28/Sep/2021:12:44:54 +0000] "GET / HTTP/1.1" 200 695 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36" "-"
+172.20.35.37 - - [28/Sep/2021:12:44:54 +0000] "GET /style.css HTTP/1.1" 200 340 "http://3.108.221.125:31937/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36" "-"
+172.20.35.37 - - [28/Sep/2021:12:44:54 +0000] "GET /scorekeeper.js HTTP/1.1" 200 1459 "http://3.108.221.125:31937/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36" "-"
+2021/09/28 12:44:55 [error] 6#6: *2 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 172.20.35.37, server: localhost, request: "GET /favicon.ico HTTP/1.1", host: "3.108.221.125:31937", referrer: "http://3.108.221.125:31937/"
+172.20.35.37 - - [28/Sep/2021:12:44:55 +0000] "GET /favicon.ico HTTP/1.1" 404 555 "http://3.108.221.125:31937/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36" "-"
+
+
+
+try to communicated container to container refer to docker network concept
+
+-----------------------------------------------------------------------
+
+Init Containers:-
+initallisation      desnt apply livenesprob,redinessprob
+SideCar Containers
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: myapp-container
+    image: sreeharshav/rollingupdate:v1
+  initContainers:  
+  - name: init-service
+    image: busybox:latest
+    command: ['sh', '-c', "sleep 60"] 
+  - name: init-mydb
+    image: busybox:latest
+    command: ['sh', '-c' "sleep 60"]
+
+
+root@ip-172-31-40-54:~# echo 'apiVersion: v1
+> kind: Pod
+> metadata:
+>   name: mypod-pod
+>   labels:
+>     app: myapp
+> spec:
+>   containers:
+>   - name: myapp-container
+>     image: sreeharshav/rollingupdate:v1
+>   initContainers:
+>   - name: init-service
+>     image: busybox:latest
+>     command: ['sh', '-c', "sleep 60"]
+>   - name: init-mydb
+>     image: busybox:latest
+>     command: ['sh', '-c' "sleep 60"]' | kubectl create -f -
+pod/mypod-pod created
+
+
+root@ip-172-31-40-54:~# kubectl get pods
+NAME        READY   STATUS     RESTARTS   AGE
+mypod-pod   0/1     Init:0/2   0          35s
+superpod    3/3     Running    0          52m
+
+
+go inside pod
+check nslookup for ip address

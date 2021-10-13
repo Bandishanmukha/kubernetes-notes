@@ -1,0 +1,266 @@
+Probes:
+
+kunernetes adv self hellling
+
+if up the application we have change to down for 2 chnages
+
+1. Intital delay
+2. 
+
+
+root@ip-172-31-24-186:~# kubectl get nodes
+NAME                                          STATUS   ROLES                  AGE   VERSION
+ip-172-20-36-8.us-east-2.compute.internal     Ready    node                   17m   v1.21.4
+ip-172-20-55-235.us-east-2.compute.internal   Ready    control-plane,master   19m   v1.21.4
+ip-172-20-58-9.us-east-2.compute.internal     Ready    node                   17m   v1.21.4
+
+
+v.1.51.9
+
+their working rolling-update
+
+now we are useing v1.21.4 this version rolling-update are removed
+
+Run 'kubectl --help' for usage.
+root@ip-172-31-24-186:~# kubectl run hello --image=index.docker.io/sreeharshav/rollingupdate:v1
+pod/hello created
+
+root@ip-172-31-24-186:~# kubectl get pods
+NAME    READY   STATUS    RESTARTS   AGE
+hello   1/1     Running   0          49s
+
+
+root@ip-172-31-24-186:~# kubectl expose pod hello --port=8000 --target-port=80 --type=NodePort
+service/hello exposed
+
+probes:
+kubelet will peform the probes:
+probes means intragation
+1. Rediness Probe  =>  chek the pod is ready to service the requests wont send traffic
+ if probe will fail i{The kubelet uses readiness probes to know when a container is ready to start accepting traffic.
+ A Pod is considered ready when all of its containers are ready. One use of this signal is to control which Pods are used as backends for Services. 
+When a Pod is not ready, it is removed from Service load balancers.}
+
+2. liveness Probe =>  check the pod is responding,if not restart the pod
+  it wil restart the pod{The kubelet uses liveness probes to know when to restart a container. 
+For example, liveness probes could catch a deadlock, where an application is running, but unable to make progress. 
+Restarting a container in such a state can help to make the application more available despite bugs.}
+
+
+we use 3 types to check probes
+exec
+http get
+tcp socket
+
+root@ip-172-31-24-186:~# kubectl get pods -n kube-system
+NAME                                                                  READY   STATUS    RESTARTS   AGE
+coredns-autoscaler-6f594f4c58-hz5m9                                   1/1     Running   0          31m
+coredns-f45c4bf76-jn4p5                                               1/1     Running   0          31m
+coredns-f45c4bf76-m22c8                                               1/1     Running   0          29m
+dns-controller-b9956d4b5-nq55z                                        1/1     Running   0          31m
+etcd-manager-events-ip-172-20-55-235.us-east-2.compute.internal       1/1     Running   0          31m
+etcd-manager-main-ip-172-20-55-235.us-east-2.compute.internal         1/1     Running   0          31m
+kops-controller-bj2d4                                                 1/1     Running   0          30m
+kube-apiserver-ip-172-20-55-235.us-east-2.compute.internal            2/2     Running   0          30m
+kube-controller-manager-ip-172-20-55-235.us-east-2.compute.internal   1/1     Running   0          30m
+kube-proxy-ip-172-20-36-8.us-east-2.compute.internal                  1/1     Running   0          30m
+kube-proxy-ip-172-20-55-235.us-east-2.compute.internal                1/1     Running   0          31m
+kube-proxy-ip-172-20-58-9.us-east-2.compute.internal                  1/1     Running   0          30m
+kube-scheduler-ip-172-20-55-235.us-east-2.compute.internal            1/1     Running   0          30m
+
+root@ip-172-31-24-186:~# kubectl exec -it hello service nginx status
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+[ ok ] nginx is running.
+root@ip-172-31-24-186:~#
+
+now i check in port here port dnt have issue
+
+root@ip-172-31-24-186:~# kubectl port-forward hello 8888:80
+Forwarding from 127.0.0.1:8888 -> 80
+Forwarding from [::1]:8888 -> 80
+Handling connection for 8888
+
+
+curl localhost:8888
+
+root@ip-172-31-24-186:~# kubectl expose pod hello --port=9000 --target-port=80 --type=NodePort
+service/hello exposed
+
+
+root@ip-172-31-24-186:~# ssh -i .ssh/id_rsa admin@3.144.98.11
+master public ip address
+
+
+
+kubelet is an package not an container
+
+
+now deploy ready Rediness Probe
+
+go to cluster
+
+
+mkdir testprobes
+
+
+vi k8SB1-Rediness.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+        readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            httpGet:
+                path: /
+                port: 80
+
+        livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            httpGet:
+                path: /
+                port: 80
+
+
+root@ip-172-31-24-186:~/testprobes# kubectl create -f k8SB1-Rediness.yml
+deployment.apps/nginx-deployment created
+
+
+root@ip-172-31-24-186:~/testprobes# kubectl get deploy
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+nginx-deployment   3/3     3            3           2m29s
+root@ip-172-31-24-186:~/testprobes# kubectl delete deploy nginx-deployment
+deployment.apps "nginx-deployment" deleted
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+        readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            httpGet:
+                path: /
+                port: 80
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: myservice
+  labels:
+    app:  nginx
+spec:
+  selector:
+    app:  nginx
+  type:   NodePort
+  ports:
+  - name:  name-of-the-port
+    port:  8000
+    targetPort:  80
+
+root@ip-172-31-24-186:~/testprobes# kubectl create -f k8SB1-Rediness.yml
+deployment.apps/nginx-deployment created
+service/myservice created
+
+
+use this image 
+sreeharshav/k8srlp:v2
+
+ref:
+FROM sreeharshav/rollingupdate:v3
+CMD sleep 30 && /usr/sbin/nginx -g "daemon off;"
+
+i use this command in docker file so my pod getting late
+
+
+delete all using labels..??
+
+kubect delete all -1 app=nginx
+
+
+
+root@ip-172-31-24-186:~/testprobes# kubectl  get all -l app=nginx
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/nginx-deployment-5578f7c865-5qtnn   0/1     Running   0          80s
+pod/nginx-deployment-5578f7c865-955c6   0/1     Running   0          80s
+pod/nginx-deployment-5578f7c865-z647r   0/1     Running   0          80s
+
+NAME                TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+service/myservice   NodePort   100.64.208.136   <none>        8000:32702/TCP   80s
+
+NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-deployment   0/3     3            0           80s
+
+NAME                                          DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-deployment-5578f7c865   3         3         0       80s
+
+
+
+watch -n 1 kubectl get all -1 app=nginx
+
+
+kubectl exec -it pod/nginx-deployment-5578f7c865-955c6 bash
+
+went inside the pod
+
+-----------------------------
+
+        livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            httpGet:
+                path: /
+                port: 80
+
+----------------------------------------
+
+

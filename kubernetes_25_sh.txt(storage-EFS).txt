@@ -1,0 +1,677 @@
+using EFS why means ebs can not use for different available azone
+
+if our node is deployed in different available zone we use presited the EFS how??
+
+https://www.juandebravo.com/2018/09/28/aws-efs-kubernetes/
+
+Dealing with EBS
+1. we cannot mount to multiple nodes
+2. cannot be used if the app is distrubuted multiple az
+3. Mounting takes time for EBS
+4. low mount times and stuck volumes, which equal slow deployments
+5.slow failover, which means no high avaialability
+6. poor I/o unless you want to spend a lot of money
+7FrGILE vOLume Orchestartion via a storage connector
+
+crreate efs and mount node sg in network access
+
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: efs-provisioner
+data:
+  file.system.id: 'fs-164453c7'
+  aws.region: 'ap-south-1'
+  provisioner.name: mycompany.com/aws-efs
+
+
+
+root@ip-172-31-40-54:~# kubectl get cm
+No resources found in default namespace.
+root@ip-172-31-40-54:~# echo '
+> apiVersion: v1
+> kind: ConfigMap
+> metadata:
+>   name: efs-provisioner
+> data:
+>   file.system.id: 'fs-9d26324c'
+>   aws.region: 'ap-south-1'
+>   provisioner.name: mycompany.com/aws-efs' | kubectl create -f -
+configmap/efs-provisioner created
+root@ip-172-31-40-54:~# kubectl get cm
+NAME              DATA   AGE
+efs-provisioner   3      7s
+root@ip-172-31-40-54:~#
+
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: efs-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: efs-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: efs-provisioner
+    spec:
+      containers:
+        - name: efs-provisioner
+          image: quay.io/external_storage/efs-provisioner:latest
+          env:
+            - name: FILE_SYSTEM_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: file.system.id
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: aws.region
+            - name: PROVISIONER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: provisioner.name
+          volumeMounts:
+            - name: pv-volume
+              mountPath: /persistentvolumes
+      volumes:
+        - name: pv-volume
+          nfs:
+            server: fs-164453c7.efs.ap-south-1.amazonaws.com
+            path: /
+
+
+root@ip-172-31-40-54:~# kubectl get deploy
+NAME              READY   UP-TO-DATE   AVAILABLE   AGE
+efs-provisioner   1/1     1            1           13s
+root@ip-172-31-40-54:~#
+
+
+root@ip-172-31-40-54:~# kubectl exec -it efs-provisioner-548b5f4456-zq92t -- sh
+/ #
+
+
+/ # ^C
+/ # df  -h
+Filesystem                Size      Used Available Use% Mounted on
+overlay                   7.7G      2.6G      5.0G  34% /
+tmpfs                    64.0M         0     64.0M   0% /dev
+tmpfs                     1.9G         0      1.9G   0% /sys/fs/cgroup
+fs-9d26324c.efs.ap-south-1.amazonaws.com:/
+                          8.0E         0      8.0E   0% /persistentvolumes
+/dev/root                 7.7G      2.6G      5.0G  34% /dev/termination-log
+/dev/root                 7.7G      2.6G      5.0G  34% /etc/resolv.conf
+/dev/root                 7.7G      2.6G      5.0G  34% /etc/hostname
+/dev/root                 7.7G      2.6G      5.0G  34% /etc/hosts
+shm                      64.0M         0     64.0M   0% /dev/shm
+tmpfs                     1.9G     12.0K      1.9G   0% /run/secrets/kubernetes.io/serviceaccount
+tmpfs                     1.9G         0      1.9G   0% /proc/acpi
+tmpfs                    64.0M         0     64.0M   0% /proc/kcore
+tmpfs                    64.0M         0     64.0M   0% /proc/keys
+tmpfs                    64.0M         0     64.0M   0% /proc/timer_list
+tmpfs                    64.0M         0     64.0M   0% /proc/sched_debug
+tmpfs                     1.9G         0      1.9G   0% /proc/scsi
+tmpfs                     1.9G         0      1.9G   0% /sys/firmware
+/ #
+
+
+
+EFS-----> Efs-provisioner container------>PV
+
+root@ip-172-31-40-54:~# kubectl get storageclass
+NAME                      PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+default                   kubernetes.io/aws-ebs   Delete          Immediate              false                  84m
+gp2                       kubernetes.io/aws-ebs   Delete          Immediate              false                  84m
+kops-ssd-1-17 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   true                   84m
+root@ip-1
+
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: aws-efs
+provisioner: mycompany.com/aws-efs
+
+
+root@ip-172-31-40-54:~# echo 'kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: aws-efs
+provisioner: mycompany.com/aws-efs' | kubectl create -f -
+storageclass.storage.k8s.io/aws-efs created
+
+
+root@ip-172-31-40-54:~# kubectl get storageclass
+NAME                      PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+aws-efs                   mycompany.com/aws-efs   Delete          Immediate              false                  35s
+default                   kubernetes.io/aws-ebs   Delete          Immediate              false                  86m
+gp2                       kubernetes.io/aws-ebs   Delete          Immediate              false                  86m
+kops-ssd-1-17 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   true                   86m
+root@ip-172-31-40-54:~#
+
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: efs
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+
+root@ip-172-31-40-54:~# echo 'kind: PersistentVolumeClaim
+> apiVersion: v1
+> metadata:
+>   name: efs
+> spec:
+>   storageClassName: aws-efs
+>   accessModes:
+>     - ReadWriteMany
+>   resources:
+>     requests:
+>       storage: 1Gi' | kubectl create -f -
+persistentvolumeclaim/efs created
+
+
+root@ip-172-31-40-54:~# kubectl get pvc
+NAME   STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+efs    Pending                                      aws-efs        34s
+root@ip-172-31-40-54:~# kubectl describe pvc efs
+Name:          efs
+Namespace:     default
+StorageClass:  aws-efs
+Status:        Pending
+Volume:
+Labels:        <none>
+Annotations:   volume.beta.kubernetes.io/storage-provisioner: mycompany.com/aws-efs
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:
+Access Modes:
+VolumeMode:    Filesystem
+Used By:       <none>
+Events:
+  Type    Reason                Age                From                         Message
+  ----    ------                ----               ----                         -------
+  Normal  ExternalProvisioning  14s (x4 over 58s)  persistentvolume-controller  waiting for a volume to be created, either by external provisioner "mycompany.com/aws-efs" or manually created by system administrator
+root@ip-172-31-40-54:~#
+
+
+---------------------------------------------------------------------------------------
+delete all
+
+root@ip-172-31-40-54:~# kubectl get deploy
+NAME              READY   UP-TO-DATE   AVAILABLE   AGE
+efs-provisioner   1/1     1            1           36m
+root@ip-172-31-40-54:~# kubectl delete deploy efs-provisioner
+deployment.apps "efs-provisioner" deleted
+root@ip-172-31-40-54:~# kubectl delete cm
+error: resource(s) were provided, but no name was specified
+root@ip-172-31-40-54:~# kubectl get  cm
+NAME              DATA   AGE
+efs-provisioner   3      61m
+root@ip-172-31-40-54:~# kubectl delete cm efs-provisioner
+configmap "efs-provisioner" deleted
+root@ip-172-31-40-54:~#
+
+root@ip-172-31-40-54:~# kubectl get storageclass
+NAME                      PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+aws-efs                   mycompany.com/aws-efs   Delete          Immediate              false                  13m
+default                   kubernetes.io/aws-ebs   Delete          Immediate              false                  100m
+gp2                       kubernetes.io/aws-ebs   Delete          Immediate              false                  100m
+kops-ssd-1-17 (default)   kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   true                   100m
+root@ip-172-31-40-54:~# kubectl delete storageclass aws-efs
+storageclass.storage.k8s.io "aws-efs" deleted
+
+
+https://github.com/kubernetes-retired/external-storage/blob/master/aws/efs/deploy/configmap.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: efs-provisioner
+data:
+  file.system.id: fs-47a2c22e
+  aws.region: us-west-2
+  provisioner.name: example.com/aws-efs
+  dns.name: ""
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: efs-provisioner
+data:
+  file.system.id: fs-9d26324c
+  aws.region: ap-south-1
+  provisioner.name: example.com/aws-efs
+  dns.name: "fs-9d26324c.efs.ap-south-1.amazonaws.com"
+
+
+root@ip-172-31-40-54:~# echo 'apiVersion: v1
+> kind: ConfigMap
+> metadata:
+>   name: efs-provisioner
+> data:
+>   file.system.id: fs-9d26324c
+>   aws.region: ap-south-1
+>   provisioner.name: example.com/aws-efs
+>   dns.name: "fs-9d26324c.efs.ap-south-1.amazonaws.com"
+> ' | kubectl create -f -
+configmap/efs-provisioner created
+root@ip-172-31-40-54:~# kubectl desc^C
+root@ip-172-31-40-54:~# kubectl get cm
+NAME              DATA   AGE
+efs-provisioner   4      30s
+
+git clone https://github.com/kubernetes-retired/external-storage
+
+
+root@ip-172-31-40-54:~# cd external-storage/aws/efs/deploy/
+
+
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl apply -f rbac.yaml
+clusterrole.rbac.authorization.k8s.io/efs-provisioner-runner created
+clusterrolebinding.rbac.authorization.k8s.io/run-efs-provisioner created
+role.rbac.authorization.k8s.io/leader-locking-efs-provisioner created
+rolebinding.rbac.authorization.k8s.io/leader-locking-efs-provisioner created
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy#
+
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# vi manifest.yaml
+
+
+root@ip-172-31-40-54:~# kubectl apply -f external-storage/aws/efs/deploy/manifest.yaml
+configmap/efs-provisioner created
+deployment.apps/efs-provisioner created
+storageclass.storage.k8s.io/aws-efs created
+persistentvolumeclaim/efs created
+
+
+vi rbac. yml
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+
+add below lines :-
+
+  rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+vi rbac.yaml
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: efs-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: run-efs-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: efs-provisioner
+     # replace with namespace where provisioner is deployed
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: efs-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-efs-provisioner
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-efs-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: efs-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: default
+roleRef:
+  kind: Role
+  name: leader-locking-efs-provisioner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efs-provisioner
+  namespace: default
+
+---------------------------------------------------------
+vi manifesto.yml
+
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: efs-provisioner
+data:
+  file.system.id: fs-9d26324c
+  aws.region: ap-south-1
+  provisioner.name: example.com/aws-efs
+  dns.name: ""
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: efs-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: efs-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: efs-provisioner
+    spec:
+      serviceAccount: efs-provisioner
+      containers:
+        - name: efs-provisioner
+          image: quay.io/external_storage/efs-provisioner:latest
+          env:
+            - name: FILE_SYSTEM_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: file.system.id
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: aws.region
+            - name: DNS_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: dns.name
+                  optional: true
+            - name: PROVISIONER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: provisioner.name
+          volumeMounts:
+            - name: pv-volume
+              mountPath: /persistentvolumes
+      volumes:
+        - name: pv-volume
+          nfs:
+            server: fs-9d26324c.efs.ap-south-1.amazonaws.com
+            path: /
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: aws-efs
+provisioner: example.com/aws-efs
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: efs
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "aws-efs"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+---
+
+
+
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl delete -f rbac.yaml
+clusterrole.rbac.authorization.k8s.io "efs-provisioner-runner" deleted
+clusterrolebinding.rbac.authorization.k8s.io "run-efs-provisioner" deleted
+role.rbac.authorization.k8s.io "leader-locking-efs-provisioner" deleted
+rolebinding.rbac.authorization.k8s.io "leader-locking-efs-provisioner" deleted
+serviceaccount "efs-provisioner" deleted
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl create -f rbac.yaml
+clusterrole.rbac.authorization.k8s.io/efs-provisioner-runner created
+clusterrolebinding.rbac.authorization.k8s.io/run-efs-provisioner created
+role.rbac.authorization.k8s.io/leader-locking-efs-provisioner created
+rolebinding.rbac.authorization.k8s.io/leader-locking-efs-provisioner created
+serviceaccount/efs-provisioner created
+
+
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl delete -f rbac.yaml
+clusterrole.rbac.authorization.k8s.io "efs-provisioner-runner" deleted
+clusterrolebinding.rbac.authorization.k8s.io "run-efs-provisioner" deleted
+role.rbac.authorization.k8s.io "leader-locking-efs-provisioner" deleted
+rolebinding.rbac.authorization.k8s.io "leader-locking-efs-provisioner" deleted
+serviceaccount "efs-provisioner" deleted
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl create -f rbac.yaml
+clusterrole.rbac.authorization.k8s.io/efs-provisioner-runner created
+clusterrolebinding.rbac.authorization.k8s.io/run-efs-provisioner created
+role.rbac.authorization.k8s.io/leader-locking-efs-provisioner created
+rolebinding.rbac.authorization.k8s.io/leader-locking-efs-provisioner created
+serviceaccount/efs-provisioner created
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# ^C
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# vi rbac.yaml
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# vi manifest.yaml
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl create manifest.yaml
+Error: must specify one of -f and -k
+
+error: unknown command "manifest.yaml"
+See 'kubectl create -h' for help and examples
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl create -f manifest.yaml
+configmap/efs-provisioner created
+deployment.apps/efs-provisioner created
+storageclass.storage.k8s.io/aws-efs created
+persistentvolumeclaim/efs created
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl get pvc
+NAME   STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+efs    Bound    pvc-130caa54-a050-4706-97f7-c9d1f1d5cd76   1Mi        RWX            aws-efs        7s
+--------------------------------------
+
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: efs
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# echo 'kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: efs-1
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi' | kubectl create -f -
+persistentvolumeclaim/efs-1 created
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM           STORAGECLASS   REASON   AGE
+pvc-130caa54-a050-4706-97f7-c9d1f1d5cd76   1Mi        RWX            Delete           Bound    default/efs     aws-efs                 2m20s
+pvc-2696c3d2-a941-4581-8f00-4aefc162db9b   1Gi        RWX            Delete           Bound    default/efs-1   aws-efs                 8s
+
+
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl delete pv --all
+persistentvolume "pvc-130caa54-a050-4706-97f7-c9d1f1d5cd76" deleted
+persistentvolume "pvc-2696c3d2-a941-4581-8f00-4aefc162db9b" deleted
+
+
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: efs-1
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+No resources found
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# echo 'kind: PersistentVolumeClaim
+> apiVersion: v1
+> metadata:
+>   name: efs-1
+> spec:
+>   storageClassName: aws-efs
+>   accessModes:
+>     - ReadWriteMany
+>   resources:
+>     requests:
+>       storage: 1Gi' | kubectl create -f -
+persistentvolumeclaim/efs-1 created
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM           STORAGECLASS   REASON   AGE
+pvc-53cf8465-a7ef-49e8-8536-067e0b4f7ac3   1Gi        RWX            Delete           Bound    default/efs-1   aws-efs                 21s
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy#
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - name: efs-pvc
+            mountPath: /tmp/efsvol
+      volumes:
+         - name: efs-pvc
+           persistentVolumeClaim:
+              claimName: efs-1
+
+root@ip-172-31-40-54:~/external-storage/aws/efs/deploy# kubectl exec -it nginx-deployment-58c65bdc7c-khh2m -- bash
+root@nginx-deployment-58c65bdc7c-khh2m:/# cd /tmp/efsvol/
+root@nginx-deployment-58c65bdc7c-khh2m:/tmp/efsvol#
+
+root@ip-172-31-40-54:~# kubectl get pods                                      │root@nginx-deployment-58c65bdc7c-sd9w5:│root@nginx-deployment-58c65bdc7c-whgvq
+NAME                                READY   STATUS    RESTARTS   AGE          │/tmp/efsvol# watch -n 1 ls -al         │:/tmp/efsvol# touch 1
+efs-provisioner-5d87dbbfdc-qf6h6    1/1     Running   0          52m          │root@nginx-deployment-58c65bdc7c-sd9w5:│root@nginx-deployment-58c65bdc7c-whgvq
+nginx-deployment-58c65bdc7c-khh2m   1/1     Running   0          3m5s         │/tmp/efsvol# watch -n 1 ls -al         │:/tmp/efsvol# apt update && apt instal
+nginx-deployment-58c65bdc7c-sd9w5   1/1     Running   0          3m5s         │                                       │l watch -y
+nginx-deployment-58c65bdc7c-whgvq   1/1     Running   0          3m5s         │                                       │
+root@ip-172-31-40-54:~# kubectl exec -it nginx-deployment-58c65bdc7c-khh2m -- │                                       │
+bash                                                                          │                                       │
+root@nginx-deployment-58c65bdc7c-khh2m:/# cd /tmp/                            │                                       │
+root@nginx-deployment-58c65bdc7c-khh2m:/tmp# ls                               │                                       │
+efsvol                                                                        │                                       │
+root@nginx-deployment-58c65bdc7c-khh2m:/tmp# cd efsvol/                       │                                       │
+root@nginx-deployment-58c65bdc7c-khh2m:/tmp/efsvol#                           │                                       │
+                                                       
+
+root@nginx-deployment-58c65bdc7c-khh2m:/tmp/efsvol# \                         │                                       │
+> for I in {1..10}                                                            │                                       │
+> do                                                                          │total 20                               │total 20
+> echo ${date} > File$1                                                       │drwxrws--x 2 root 2002 6144 Oct  4 17:2│drwxrws--x 2 root 2002 6144 Oct  4 17:
+> cat File$I                                                                  │2 .                                    │22 .
+> sleep 5                                                                     │drwxrwxrwt 1 root root 4096 Oct  4 17:1│drwxrwxrwt 1 root root 4096 Oct  4 17:
+> done                                                                        │6 ..                                   │19 ..
+cat: File1: No such file or directory                                         │-rw-r--r-- 1 root 2002    0 Oct  4 17:1│-rw-r--r-- 1 root 2002    0 Oct  4 17:
+cat: File2: No such file or directory                                         │7 1                                    │17 1
+cat: File3: No such file or directory                                         │-rw-r--r-- 1 root 2002    1 Oct  4 17:2│-rw-r--r-- 1 root 2002    1 Oct  4 17:
+cat: File4: No such file or directory                                         │3 File                                 │23 File
+                                                                              │-rw-r--r-- 1 root 2002   28 Oct  4 17:2│-rw-r--r-- 1 root 2002   28 Oct  4 17:
+                                                                              │0 file1                                │20 file1
+                                                                              │                                       │
+                                                                              │                                       │
+                                                                              │                                       │
+                                                                              │                                       │
+                                                                              │                                       │
+                                                                              │                                       │
+                                                                              │                                       │
+                                                                              │                                       │
+                                               
+
+
+
+getting validate error
+
+kubectl get pod
+
+after create pods
+
+kubectl exec -it pod id bash
+
+cd /tmp/efsvol
+   *** data mount in all pods
+we can write file any pod in that path file canshare in all pod
+
+
+even pods are recreaded files are still there

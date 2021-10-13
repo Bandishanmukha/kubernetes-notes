@@ -1,0 +1,771 @@
+1. why kubernets & python
+2. who need to do this course
+3. Syallabus
+4. Docker & YAML
+5. Q & A
+oka web application ki ssl termination chaisi https 3rd party cerificate use chaisi cnvert chaisaru
+
+
+docker, images,networks,dockerfile
+yaml
+kubernetes team managemnt
+docker team meamber
+
+kubernertes run time ------->> Docker,CRI-O,Containered,other CRI runtimes: frakti
+
+
+kubernetes orchestrator---dockerh1,dockerh2,dockerh3
+
+node status
+pods status
+health
+logging
+replicas
+
+docker pull nginx
+
+{pull d image}
+docker run --rm -dit -p/--publish 8000:80 nginx:latest
+
+docker pull sreeharshav/rollingupdate:v3
+
+docker run --rm -dit --name sreecon1 -p 9000:80 sreeharshav/rollingupdate:v3
+
+docker ps
+
+Dockerfile
+FROM ubuntu:18.04
+RUN apt update && apt install nginx -y
+RUN apt install -y wget curl net-tools nano
+cmd["nginx", "-g", "daemon off,"]
+
+
+docker build -t repo/newnginx:v1 .
+
+docker run --rm -dit --name newimage -p 8500:80 sreeharshav/newnginx:v1
+
+
+docker network create xyz
+
+
+------------------------------------
+              class2
+------------------------------------
+ymlfile
+
+watch if yo free 2 video
+
+Monolithic & Microservices
+
+
+
+--------------------------------------------------------
+              class 3
+--------------------------------------------------------
+kops cluster creation
+
+check after
+
+--------------------------------------------------------
+               class 4
+--------------------------------------------------------
+cluster management- export_kops option
+
+
+kops create cluster --name=devopsk8s.xyz --state=s3://devopsk8s.xyz --zones=us-east-1a --node-count=2 --node-size=t2.micro --master-size=t2.small --master-volume-size 8 --node-volume-size 8 --dns-zone=devopsk8s.xyz 
+
+cluster doent up because we are not given --yes
+
+kops edit ig --name=kiwidev.xyz --yes
+
+{kops edit ig --name=kiwidev.xyz master-ap-south-1a --state s3://kiwi1dev.xyz}
+
+i have to set flages
+
+
+1. i have to set vi to nano how?
+
+export EDITOR=nano
+
+export NAME=${kiwidev.xyz}
+export KOPS_STATE_STORE=s3://${kiwi1dev.xyz}
+
+export EDITOR=nano
+export NAME=clustername.xyz
+export KOPS_STATE_STORE=s3://clustername.xyz
+
+
+kops get cluster
+
+vi .bashrc
+export NAME=clustername.xyz
+export KOPS_STATE=s3://clustername.xyz
+alias ku='kubectl'
+
+
+
+kops get cluster
+    get output
+kops get ig
+
+
+
+kops get cluster -o yaml
+
+kops get cluster -o yaml --state s3://kiwi3dev.xyz
+ku get ig
+
+kops edit ig --name=clustername.xyz master-ap-sout-1a --state s3://clustername.xyz
+
+after changes is done use below command
+
+
+kops update cluster --name cluster.xyz --yes --state s3://cluster.xyz
+
+tmux
+terminal multiplex
+
+ctrl+b+shift+% open terminal
+
+second terminal watch kubectl get nodes
+
+watch -n1 kubectl get nodes
+
+ctrl b shift left arrow
+came back to left terminal
+
+first terminal
+
+cat .kube/config
+
+kubectl get nodes
+
+ssh -i .ssh/id_rsa admin@master ip address
+  kubectl get pods
+  kubectl get nodes
+
+ssh -i .ssh/id_rsa admin@node ip address
+  currebt we are in node env
+
+  docker version
+exit node
+------------
+mngment server
+
+ku get nodes
+
+i need to add another node how to add
+  kops edit ig nodes
+printenv
+     i change max size 2 min size 2
+
+kops update cluster --name cluster.xyz --yes --state s3://cluster.xyz
+
+check 
+ku get nodes
+
+write a sheel scriping
+vi k8s.sh
+  editmastereditnodeedit node
+
+how to change volumes 
+
+kops get cluster
+kops edit cluster
+  according we change volume here
+
+availabe commands
+        check later
+
+ku get pods -A      {backend ruuning services}
+
+what namesapace
+
+to make logical boundaries of clasuter
+
+ku get ns  
+default      if we not mention any ns
+kube-node-lease
+kube-public
+kube-system
+kube-system       kubernets ki sambadinchina container
+
+to create namespace
+
+ku create ns mines   --like vpc
+
+ku create ns homedept
+
+ku delete ns passport mines
+
+
+commands
+
+container is not pod pod is wrapper
+
+ku get 
+
+explain about how do delete cluster using editing commands,pods 
+
+--------------------------------------------------------
+                  class-5
+--------------------------------------------------------
+
+kubeadmine
+
+install kubernetees in google
+minikube on windows 10
+
+install kubeadm
+
+
+
+
+
+
+
+
+
+
+-------------------------
+ class-6
+------------------------------------------------------
+deployement
+copy the .ssh/id_rsa key in notpad to gen ppk use putty gen then after login ssh master node login 
+
+and login mngment server
+pod can be multiple container include volume
+
+***kubectl run testpod1 --image=index.docker.io/sreeharshav/rollingupdate:v1
+
+ku get pods
+
+ku describe pod nameofthepod
+
+**--troubleshootfor pod pull image---**
+
+ alias dpod='kubectl describle pods'
+
+kubectl delete pod podname
+
+ku delete pod testpod3
+
+ku edit pod testpod2
+**---changes in image---**
+
+port-forward  
+
+ku port-forward pod/testpod1 8888:80
+         take duplicate section
+       curl http://localhost:8888
+
+39:17 check once after review that
+
+vi pod.yml
+   paste the pod yml script here
+
+kubectl create -f pod.yaml
+
+ku get pods
+realtime scenniros pod deployements 
+
+kubectl create ns ns1
+kubectl create ns ns2
+
+
+ku get pods -n ns1
+
+ku get pods -n ns2
+
+kubectl -it name of the pod -n ns1 --bash
+
+-----------------------------
+
+class-7
+
+kubectl run pod hello --image=httpd:latest
+
+kubeclt get pod
+
+kubectl delete pod pod
+
+kubectl run hello --image=httpd:latest
+
+kubectl get pod hello -o yaml
+
+
+
+
+ 
+ref:-/ google/kubernetes pod yaml reference/reference kuber.io
+
+kubectl exaplain pods
+label
+
+1. ku delete pod hello
+vi pod.yaml
+
+apiversion: v1
+kind: Pod
+metadata:
+  name: memory-demo
+  labels:
+     env: prod
+     owner: shanu
+spec:
+  containers:
+  - name: container1
+    image: index.docker.io/sreeharshav/rollingupdate:v1
+  - name: container2
+    image: index.docker.io/sreeharshav/rollingupdate:v1
+  - name: container3
+    image: index.docker.io/sreeharshav/rollingupdate:v1
+
+
+2. kuectl crate -f pod.yaml
+
+  in the pod.yaml have 3pods its visible to their 3 pods after below enter command
+4. kubectl get pods
+5. kubectl describe pod mydemopod{pod Name}
+
+----
+1. kubectl get pods -o yaml
+       a. 2 type of things is there 1. annotations, 2. lables
+2.using lables
+
+ cp pod.yaml pod2.yaml
+here i change all the stuff like lables and name 
+kubectl create -f pod2.yml
+
+kubectl get pods -o wide
+
+kubectl get pods -l env-prod
+kubectl get pods -l env=dev
+
+labels have limite
+annotation has no limit
+
+kubectl annotate pod mydemopod2{pod name} data=asfccvvvfvvvvv
+
+lable can use delete
+
+kubeclt delete pod -l env=prod
+
+add lable
+kubectl lable pod mydemopod2 munnabhai=mbbs
+
+differnt /w lables and annotation
+kubectl delete -f pod2.yml
+
+vi pod2.yml
+kubectl apply -f pod2.yml
+
+kubectl get pods --show-labels
+
+add some lable vi pod2.yml
+
+kubectl apply -f pod2.yml
+
+diff b/w kubectl create&apply
+
+remove lable*
+
+kubectl lsbel pod mydemopod3 agent-
+
+-------------------------
+class -8
+minikube for test env
+
+step:-1
+kops create cluster
+
+step:-2 for minikube launch spot instance
+
+https://www.radishlogic.com/kubernetes/running-minikube-in-aws-ec2-ubuntu/
+
+https://blog.kornelondigital.com/2019/04/28/setting-up-a-kubernetes-sandbox-in-aws-ec2/
+
+sudo apt-get update && sudo apt-get install -y apt-transport-https
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee -a /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubectl conntrack
+
+we need to install docker also 
+
+curl https://get.docker.com | bash
+
+curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && chmod +x minikube
+sudo mv minikube /usr/local/bin
+set NO_PROXY=localhost,127.0.0.1,10.96.0.0/12,192.168.99.1/24,192.168.39.0/24
+minikube start --vm-driver=none
+
+minitkube start --vm-driver=none
+
+kubectlget pods -A
+
+kubectl get pods -n kube-system
+kubectl get pods -n kube-system --show-labels
+
+kubectl get pods -n kube-system -L k8s-app=kube-dns
+
+kubectl run pod1 --image=index.io/sreeharshav/testcontainer:v1
+
+kubectl get pods
+kubectl expose pod pod1 --port=8000 --target-port=80 --type=Nodeport
+
+kubectl get all
+
+curl ipaddress:8000
+30918 port no for pod it access on outside
+
+---- kops
+replication controller
+replica set
+
+kops rolling-update cluster
+
+
+create hostname as in minicube
+vi /etc/hostname
+
+source /etc/hostname
+
+
+-----------------------------------------------------
+class -9
+Replication controller & replication set
+
+
+RC
+3 section
+ metadat,spec,template__spec
+
+vi rc.yml
+kubectl apply -f rc.yml
+
+kubectl get pods
+kubectl get rc
+kubectl describe rc nginx
+
+delete all pods
+
+create new yaml change name instate of nginx to superstart
+
+kubectl apply -f rc.yml
+
+ku get pods
+
+superstar-vjhffj   this one gene random
+
+kubectl get pods -o wide
+
+now repicaset chang pod no instad of 3-4
+
+kubectl apply -f rc.yaml
+
+soo here i Created new Pod 
+
+for example i face the issue to restarted craeted pod i will do troubleshoot HOw??
+
+*kubectl get pods --show-labels
+
+tmux
+
+kubectl get pods    
+
+kubectl get pods --show-labels
+
+watch -n 1 kubectl get pods --show-labels
+
+2* kubectl pod superstar-2dt4k app-
+
+kubectl exec -it superstar-2dghh --bash
+
+it went to pod
+
+kubectl label pod superstar-2dt4k app=nginx
+
+time 19:08 sec video pause
+                          
+
+
+________________________________________________________________________________________
+  
+   class 10
+
+rolling updates and updating pods
+
+Problem for Repica Sets
+
+Login into cluster
+
+Replication controller
+
+kubectl get nodes
+
+cat rc.yml
+
+copy this replica control paste in visual studio
+
+spining up new pods and then deleting the old ones
+
+delting existing pods and created new one its not an probem
+
+Switching from the old to the ne version at once (BLUE-Green)
+
+
+
+rolling update
+
+spining UP Deployement:-
+
+login into cluster
+
+kubectl get nodes
+
+nano rc.yml
+
+paste the ml file here
+
+kubectl create -f rc.yml
+
+kubectl get pods 
+
+version 1 is created pods
+
+kubectl expose rc superstar --port=8000 --target-port=80 --type=nodeport
+
+superstar is we mention on metadata(name of module in rc.yml)
+
+
+curl ipaddress:portnumber 
+entre into cmd promt
+
+now i need to deploy version 2
+
+vi rc.yml
+change v1 instad of v3
+
+kubectl create -f rc.yml
+
+kubectl describe rc superstar
+kubecl get pods --show-labels
+
+
+2 type
+
+delete old one and create new one
+{kubectl delete pod pod_name mentione on get pods}
+27:00
+
+now deleted all the cluster
+kubectl delete rc superstar
+
+Blue-green deployement:-
+
+nano rc.yml
+paste image v1
+
+
+cp rc rc2
+
+
+
+kubectl create -f rc.yml
+
+kubectl get pods
+
+kubectl expose rc superstar --port=8000 --target-port=80 --type=nodeport
+
+
+kubectl edit svc superstar
+
+search in google
+
+kubernets attach service replication controller
+
+
+kubectl get pods -n kube-system --v 6
+
+
+kubectl rolling-update superstar superstar2 --image=index.docker.io/sreeharshav/testcontainer:v1  
+
+
+-------------------------------------------------------------------------------------
+class-11
+
+deployements
+Liveness Probes
+Rediness Probes
+
+* Deployements
+
+assume for RC
+replication controller
+
+vi rc1.yml
+kubectl create -f rc1.yml
+kubectl get pods
+kbectl expose rc seletedpodname --pot=8000 --target-port=80 --type=NodePort
+kubectl get all
+rolling update cmd
+
+kubectl rolling-update superstar1 superstar2 --image=index.docker.io/sreeharshav/testcontainer:v1
+
+kubectl rolling-update --help
+
+kubectl rolling-update frontend-v1 frontend-v2 --rollback
+
+kubectl rolling-update superstar2 superstart3 --image=index.docker.io/sreeharshav/rollingupdate:v1
+
+
+problem we face in RC
+1. It will be a manual update from one image to other image
+2. new rc will be created and old rc will be deleted
+3. Roll back needs to change again to the old image
+4.Overall manual process and rc rolling-update is deprecated.
+  
+Deployement advantages
+1. it uses replicasets and replicasets automatically performs the rolling updates
+2. rollback is easy as we can record the deployments
+3. we can use liveness and readyness probes to improve application availibility
+4. we can pause & resume the deployement which usefull canary update
+
+vi deploy.yml
+
+apiVersion: extensions/v1beta1                 /           apps/v1 
+
+kind: Deployment 
+
+metadata: 
+
+  name: nginx-deployment 
+
+  labels: 
+
+    app: nginx 
+
+spec: 
+
+  replicas: 3 
+
+  selector: 
+
+    matchLabels: 
+
+      app: nginx 
+
+  template: 
+
+    metadata: 
+
+      labels: 
+
+        app: nginx 
+
+    spec: 
+
+      containers: 
+
+      - name: nginx 
+
+        image: sreeharshav/rollingupdate:v3 
+
+        ports: 
+
+        - containerPort: 80 
+-------------------------------------------------------------------------
+                                          another tab
+watch -n1 kubectl get all
+---------------------------------------------------------------------------
+current tab
+
+kubectl create -f deploy.yml
+
+vi deploy.yml
+
+apiVersion: extensions/v1beta1 
+
+kind: Deployment 
+
+metadata: 
+
+  name: nginx-deployment 
+
+  labels: 
+
+    app: nginx 
+
+spec: 
+
+  minReadySeconds: 20 
+
+  replicas: 3 
+
+  selector: 
+
+    matchLabels: 
+
+      app: nginx 
+
+  strategy: 
+
+    rollingUpdate: 
+
+      maxSurge: 1 
+
+      maxUnavailable: 0 
+
+    type: RollingUpdate 
+
+  template: 
+
+    metadata: 
+
+      labels: 
+
+        app: nginx 
+
+    spec: 
+
+      containers: 
+
+      - name: nginx 
+
+        image: sreeharshav/testcontainer:v1 
+
+        ports: 
+
+        - containerPort: 80 
+
+ 
+
+--- 
+
+kind: Service 
+
+apiVersion: v1 
+
+metadata: 
+
+  name: myservice 
+
+spec: 
+
+  selector: 
+
+    app:  nginx 
+
+  type:   NodePort 
+
+  ports: 
+
+  - name:  name-of-the-port 
+
+    port:  8000 
+
+    targetPort:  80 
+
+
+kubectl apply -f

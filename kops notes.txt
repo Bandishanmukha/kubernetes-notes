@@ -1,0 +1,51 @@
+kops comments
+
+
+kops create cluster --name=kiwidev.xyz --state=s3://kiwidev4.xyz --zones=ap-south-1a,ap-south-1b --node-count=4 --node-size=t2.medium --master-size=t2.medium --master-volume-size 8 --node-volume-size 8 --dns-zone=kiwidev.xyz --yes
+
+
+
+kops get cluster --state s3://kiwidev4.xyz
+kops get ig --name kiwidev.xyz --state s3://kiwidev4.xyz
+kops edit ig --name=kiwidev4.xyz master-ap-south-1a --state s3://kiwidev4.xyz
+kops edit ig --name=kiwidev.xyz nodes-ap-south-1a --state s3://kiwidev4.xyz
+kops update cluster --name kiwidev1.xyz --yes --state  s3://kiwidev4.xyz
+kops rolling-update cluster  --name kiwi2dev.xyz --yes --state  s3://kiwi2dev.xyz
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+kops delete cluster --name=kiwidev.xyz --state s3://kiwidev4.xyz --yes
+
+
+
+
+
+cluster modified
+
+kops edit ig --name=kiwi1dev.xyz master-us-east-2a --state s3://kiwi3dev.xyz
+
+
+kops edit ig --name=kiwi1dev.xyz nodes-us-east-2a --state s3://kiwi3dev.xyz
+
+
+
+Suggestions:
+ * validate cluster: kops validate cluster --wait 10m
+ * list nodes: kubectl get nodes --show-labels
+ * ssh to the master: ssh -i ~/.ssh/id_rsa ubuntu@api.kiwidev.xyz
+ * the ubuntu user is specific to Ubuntu. If not using Ubuntu please use the appropriate user based on your OS.
+ * read about installing addons at: https://kops.sigs.k8s.io/operations/addons.

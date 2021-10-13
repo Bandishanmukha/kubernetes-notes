@@ -1,0 +1,128 @@
+1. Ingress Controller Deployment
+2. Kubernetes dashboard
+3.namespaces
+ 
+                tcp/32123                           Node  POD TCP/80           
+
+aws CLB -------TCP/32123-----svcTCP/8000------------Node  PoDtcp/80                  container port/target port--TCP/80
+
+                TCP/32110                           Node POD tcp/80
+
+
+
+www.kiwidev.xyz     svc5000
+aws.kiwidev.xyz     svc8000
+azure.kiwidev.xyz   svc9000
+
+                                                     TCP/5000             NODE{POD TCP/80}
+route53--------AWS CLB------Nginx controller-----svc tcp/8000-------------NODE{POD TCP/80}
+                                                     tcp/9000             NODE{POD TCP/80}
+
+
+
+Ingress is set of rules 13:21
+
+
+for supoose
+
+www.kiwwidev.xyz                                                                   Ingress
+aws.kiwidev.xyz------------------------Load Balancer----------Ingress controller   Ingress   svc
+azure.kiwidev.xyz                                                                  Ingress
+
+
+https://github.com/kubernetes/ingress-nginx/blob/main/docs/how-it-works.md
+
+
+
+root@ip-172-31-36-152:~# kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-0.32.0/deploy/static/provider/aws/deploy.yaml
+namespace/ingress-nginx created
+
+
+root@ip-172-31-36-152:~# kubectl get pods -A
+NAMESPACE       NAME                                                                   READY   STATUS      RESTARTS   AGE
+ingress-nginx   ingress-nginx-admission-create-5k9j9                                   0/1     Completed   0          102s
+ingress-nginx   ingress-nginx-admission-patch-4skm4                                    0/1     Completed   0          102s
+ingress-nginx   ingress-nginx-controller-98f46f89d-t9gzf                               1/1     Running     0          112s
+kube-system     coredns-5489b75945-58gvp                                               1/1     Running     0          44m
+kube-system     coredns-5489b75945-m728w                                               1/1     Running     0          45m
+kube-system     coredns-autoscaler-6f594f4c58-n2htv                                    1/1     Running     0          45m
+kube-system     dns-controller-85c6f99cc7-f8vwm                                        1/1     Running     0          45m
+kube-system     etcd-manager-events-ip-172-20-38-114.ap-south-1.compute.internal       1/1     Running     0          45m
+kube-system     etcd-manager-main-ip-172-20-38-114.ap-south-1.compute.internal         1/1     Running     0          45m
+kube-system     kops-controller-f7gn8                                                  1/1     Running     0          45m
+kube-system     kube-apiserver-ip-172-20-38-114.ap-south-1.compute.internal            2/2     Running     0          45m
+kube-system     kube-controller-manager-ip-172-20-38-114.ap-south-1.compute.internal   1/1     Running     0          46m
+kube-system     kube-proxy-ip-172-20-38-114.ap-south-1.compute.internal                1/1     Running     0          45m
+kube-system     kube-proxy-ip-172-20-48-212.ap-south-1.compute.internal                1/1     Running     0          43m
+kube-system     kube-proxy-ip-172-20-51-228.ap-south-1.compute.internal                1/1     Running     0          43m
+kube-system     kube-scheduler-ip-172-20-38-114.ap-south-1.compute.internal            1/1     Running     0          45m
+root@ip-172-31-36-152:~# ^C
+
+
+root@ip-172-31-36-152:~# kubectl create deploy deploy1 --image=index.docker.io/sreeharshav/rollingupdate:v1
+deployment.apps/deploy1 created
+root@ip-172-31-36-152:~# kubectl create deploy deploy2 --image=index.docker.io/sreeharshav/rollingupdate:v3
+deployment.apps/deploy2 created
+root@ip-172-31-36-152:~# kubectl create deploy deploy3 --image=index.docker.io/sreeharshav/testcontainer:v1
+deployment.apps/deploy3 created
+
+
+root@ip-172-31-36-152:~# kubectl get deploy
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+deploy1   1/1     1            1           86s
+deploy2   1/1     1            1           61s
+deploy3   1/1     1            1           50s
+
+
+root@ip-172-31-36-152:~# kubectl expose deploy deploy1 --port=5000 --target-port=80
+service/deploy1 exposed
+root@ip-172-31-36-152:~# kubectl expose deploy deploy2 --port=8000 --target-port=80
+service/deploy2 exposed
+root@ip-172-31-36-152:~# kubectl expose deploy deploy3 --port=9000 --target-port=80
+service/deploy3 exposed
+
+
+
+vi deploy1-ingress.yml
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: example-ingress
+  annotations:
+    ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: www.kiwidev.xyz
+    http:
+      paths:
+        - path: /
+          backend:
+            serviceName: deploy1
+            servicePort: 5000
+
+
+
+root@ip-172-31-36-152:~# kubectl create -f deploy1-ingress.yml
+Warning: extensions/v1beta1 Ingress is deprecated in v1.14+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.extensions/example-ingress1 created
+root@ip-172-31-36-152:~# kubectl get ingress
+NAME               CLASS    HOSTS             ADDRESS   PORTS   AGE
+example-ingress1   <none>   www.kiwidev.xyz             80      14s
+
+
+
+delete all one
+
+root@ip-172-31-36-152:~# kubectl expose deploy deploy1 --port=8000 --target-port=80 --type=LoadBalancer
+service/deploy1 exposed
+
+
+root@ip-172-31-36-152:~# kubectl api-versions | grep -i ing
+autoscaling/v1
+autoscaling/v2beta1
+autoscaling/v2beta2
+networking.k8s.io/v1
+networking.k8s.io/v1beta1
+scheduling.k8s.io/v1
+scheduling.k8s.io/v1beta1

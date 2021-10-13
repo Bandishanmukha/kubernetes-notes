@@ -1,0 +1,451 @@
+Kubernetes RBAC (Rollbase access controller)
+Role    - Limited To namespace
+ClusterRole  Global and applied to whole cluster   (Role/CRole  => need to assign to User & Service Account)
+RoleBinding
+ClusterRoleBinding
+
+Role/CRole  => need to assign to User & Service Account
+
+
+
+root@ip-172-31-36-152:~# kubectl api-resources | grep -i true
+
+True gen all namespacs
+
+
+root@ip-172-31-36-152:~# kubectl api-resources | grep -i false
+
+its not beloning to namespaces
+
+root@ip-172-31-36-152:~# kubectl api-resources | grep -i rbac.authorization.k8s.io
+clusterrolebindings                            rbac.authorization.k8s.io/v1           false        ClusterRoleBinding
+clusterroles                                   rbac.authorization.k8s.io/v1           false        ClusterRole
+rolebindings                                   rbac.authorization.k8s.io/v1           true         RoleBinding
+roles                                          rbac.authorization.k8s.io/v1           true         Role
+root@ip-172-31-36-152:~#
+
+
+
+root@ip-172-31-36-152:~# kubectl api-versions | grep -i rbac.authorization.k8s.io
+rbac.authorization.k8s.io/v1
+rbac.authorization.k8s.io/v1beta1
+
+
+
+root@ip-172-31-36-152:~# kubectl create namespace testns --dry-run
+W0920 14:51:29.040439    1129 helpers.go:555] --dry-run is deprecated and can be replaced with --dry-run=client.
+namespace/testns created (dry run)
+root@ip-172-31-36-152:~# kubectl create namespace testns --dry-run -o yaml
+W0920 14:51:36.503101    1134 helpers.go:555] --dry-run is deprecated and can be replaced with --dry-run=client.
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: null
+  name: testns
+spec: {}
+status: {}
+
+
+
+
+root@ip-172-31-36-152:~# kubectl create
+Available Commands:
+  clusterrole         Create a cluster role
+  clusterrolebinding  Create a cluster role binding for a particular cluster role
+  configmap           Create a config map from a local file, directory or literal value
+  cronjob             Create a cron job with the specified name
+  deployment          Create a deployment with the specified name
+  ingress             Create an ingress with the specified name
+  job                 Create a job with the specified name
+  namespace           Create a namespace with the specified name
+  poddisruptionbudget Create a pod disruption budget with the specified name
+  priorityclass       Create a priority class with the specified name
+  quota               Create a quota with the specified name
+  role                Create a role with single rule
+  rolebinding         Create a role binding for a particular role or cluster role
+  secret              Create a secret using specified subcommand
+  service             Create a service using a specified subcommand
+  serviceaccount      Create a service account with the specified name
+
+
+
+root@ip-172-31-36-152:~# kubectl create role
+error: exactly one NAME is required, got 0
+See 'kubectl create role -h' for help and examples
+root@ip-172-31-36-152:~# kubectl create role -h
+Create a role with single rule.
+
+Examples:
+  # Create a role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
+  kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
+
+  # Create a role named "pod-reader" with ResourceName specified
+  kubectl create role pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
+
+  # Create a role named "foo" with API Group specified
+  kubectl create role foo --verb=get,list,watch --resource=rs.extensions
+
+  # Create a role named "foo" with SubResource specified
+  kubectl create role foo --verb=get,list,watch --resource=pods,pods/status
+
+Options:
+      --allow-missing-template-keys=true: If true, ignore any errors in templates when a field or map key is missing in
+the template. Only applies to golang and jsonpath output formats.
+      --dry-run='none': Must be "none", "server", or "client". If client strategy, only print the object that would be
+sent, without sending it. If server strategy, submit server-side request without persisting the resource.
+      --field-manager='kubectl-create': Name of the manager used to track field ownership.
+  -o, --output='': Output format. One of:
+json|yaml|name|go-template|go-template-file|template|templatefile|jsonpath|jsonpath-as-json|jsonpath-file.
+      --resource=[]: Resource that the rule applies to
+      --resource-name=[]: Resource in the white list that the rule applies to, repeat this flag for multiple items
+      --save-config=false: If true, the configuration of current object will be saved in its annotation. Otherwise, the
+annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future.
+      --show-managed-fields=false: If true, keep the managedFields when printing objects in JSON or YAML format.
+      --template='': Template string or path to template file to use when -o=go-template, -o=go-template-file. The
+template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+      --validate=true: If true, use a schema to validate the input before sending it
+      --verb=[]: Verb that applies to the resources contained in the rule
+
+Usage:
+  kubectl create role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename]
+[--dry-run=server|client|none] [options]
+
+Use "kubectl options" for a list of global command-line options (applies to all commands).
+
+
+
+kubectl create role testrole1 --verb=get --verb=list -o yaml --dry-run
+
+
+root@ip-172-31-36-152:~# kubectl create role testrole1 --verb=get --verb=list -o yaml --dry-run
+W0920 14:59:06.420885    1180 helpers.go:555] --dry-run is deprecated and can be replaced with --dry-run=client.
+error: at least one resource must be specified
+
+
+root@ip-172-31-36-152:~# kubectl create role testrole1 --verb=get --verb=list --resource-name=hello --resource=pods -o yaml --dry-run
+W0920 15:02:46.003770    1190 helpers.go:555] --dry-run is deprecated and can be replaced with --dry-run=client.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: testrole1
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - hello
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+
+
+
+root@ip-172-31-36-152:~# kubectl create role testrole1 --verb=get --verb=list --resource-name=hello --resource=pods -o json --dry-run
+W0920 15:04:14.152368    1197 helpers.go:555] --dry-run is deprecated and can be replaced with --dry-run=client.
+{
+    "kind": "Role",
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "metadata": {
+        "name": "testrole1",
+        "creationTimestamp": null
+
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: list-pods
+rules:
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+
+    },
+    "rules": [
+        {
+            "verbs": [
+                "get",
+                "list"
+            ],
+            "apiGroups": [
+                ""
+            ],
+            "resources": [
+                "pods"
+            ],
+            "resourceNames": [
+                "hello"
+            ]
+        }
+    ]
+}
+
+ClusterRole= Prime Minister 
+we have indiviutal namespaces
+
+NS1= Testing            CM RoLe        NS2= Dev        NS3=Prod
+TestROLE                              DEVROLE        PRODROLE
+
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: testrole1
+rules:
+- apiGroups: ["", "apps","rbac.authorization.k8s.io"]
+  resources: ["pods","roles","rolebindings"]
+  verbs: ["get","list"]
+
+
+
+ex:
+CM=> Pod-reader
+PFOLIIO=> apiGroups: ["", "apps","rbac.authorization.k8s.io"]
+Deviion =>  resources: ["pods","roles","rolebindings"]
+Power =>  verbs: ["get","list"]
+
+
+
+
+
+admin1------->RoleBinding---------->NS!_ROLE
+          /
+admin2------->RoleBinding---------->NS2_ROLE
+
+
+admin3------->RoleBinding---------->NS3_ROLE
+
+
+44:24   configure docker image into pod show how to configure .kube
+
+
+
+pending start from53:52
+
+
+root@ip-172-31-36-152:~# kubectl run testing --image=sreeharshav/rollingupdate:v1
+pod/testing created
+root@ip-172-31-36-152:~# kubectl get pods
+NAME      READY   STATUS              RESTARTS   AGE
+testing   0/1     ContainerCreating   0          4s
+root@ip-172-31-36-152:~# kubectl get pods
+NAME      READY   STATUS              RESTARTS   AGE
+testing   0/1     ContainerCreating   0          6s
+root@ip-172-31-36-152:~# kubectl get pods
+NAME      READY   STATUS    RESTARTS   AGE
+testing   1/1     Running   0          10s
+
+
+root@ip-172-31-36-152:~# kubectl exec -it testing env
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=testing
+NGINX_VERSION=1.15.8-1~stretch
+NJS_VERSION=1.15.8.0.2.7-1~stretch
+KUBERNETES_PORT=tcp://100.64.0.1:443
+KUBERNETES_PORT_443_TCP=tcp://100.64.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=100.64.0.1
+KUBERNETES_SERVICE_HOST=100.64.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+TERM=xterm
+HOME=/root
+root@ip-172-31-36-152:~# kubectl get svc
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   100.64.0.1   <none>        443/TCP   134m
+
+
+check again in 55:00
+
+now i create one service a/c
+
+root@ip-172-31-36-152:~# kubectl create sa -h
+
+
+
+root@ip-172-31-36-152:~# kubectl api-resources | grep -i sa
+serviceaccounts                   sa           v1                                     true         ServiceAccount
+root@ip-172-31-36-152:~#
+
+
+root@ip-172-31-36-152:~# kubectl create serviceaccount listpods --dry-run -o yaml
+W0920 16:22:22.963056    1404 helpers.go:555] --dry-run is deprecated and can be replaced with --dry-run=client.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  creationTimestamp: null
+  name: listpods
+
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: list-pods
+rules:
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - delete
+
+
+root@ip-172-31-36-152:~# echo "
+> apiVersion: rbac.authorization.k8s.io/v1
+> kind: Role
+> metadata:
+>   name: list-pods
+> rules:
+> - apiGroups: [""]
+>   resources:
+>   - pods
+>   verbs:
+>   - get
+>   - list
+>   - delete" | kubectl create -f -
+The Role "list-pods" is invalid: rules[0].apiGroups: Required value: resource rules must supply at least one api group
+root@ip-172-31-36-152:~#
+
+
+
+root@ip-172-31-36-152:~# echo "
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: list-pods
+rules:
+- apiGroups: [\"\"]
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - delete" | kubectl create -f -
+role.rbac.authorization.k8s.io/list-pods created
+
+
+root@ip-172-31-36-152:~# kubectl get role
+NAME        CREATED AT
+list-pods   2021-09-20T16:29:16Z
+
+
+root@ip-172-31-36-152:~# kubectl describe role list-pods
+Name:         list-pods
+Labels:       <none>
+Annotations:  <none>
+PolicyRule:
+  Resources  Non-Resource URLs  Resource Names  Verbs
+  ---------  -----------------  --------------  -----
+  pods       []                 []              [get list delete]
+
+
+
+now we create service account
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: internal-kubectl
+
+
+root@ip-172-31-36-152:~# echo "
+> apiVersion: v1
+> kind: ServiceAccount
+> metadata:
+>   name: internal-kubectl" | kubectl create -f -
+serviceaccount/internal-kubectl created
+root@ip-172-31-36-152:~#
+
+
+root@ip-172-31-36-152:~# kubectl get sa
+NAME               SECRETS   AGE
+default            1         150m
+internal-kubectl   1         24s
+
+
+root@ip-172-31-36-152:~# kubectl create  sa shanu
+serviceaccount/shanu created
+root@ip-172-31-36-152:~# kubectl get sa
+NAME               SECRETS   AGE
+default            1         155m
+internal-kubectl   1         5m18s
+shanu              1         3s
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: modify-pods-to-sa
+subjects:
+  - kind: ServiceAccount
+    name: internal-kubectl
+  - kind: ServiceAccount
+    name: shanu
+roleRef:
+  kind: Role
+  name: list-pods
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: rbac.authorization.k8s.io/v1
+> kind: RoleBinding
+> metadata:
+>   name: modify-pods-to-sa
+> subjects:
+>   - kind: ServiceAccount
+>     name: internal-kubectl
+>   - kind: ServiceAccount
+>     name: shanu
+> roleRef:
+>   kind: Role
+>   name: list-pods
+>   apiGroup: rbac.authorization.k8s.io" | kubectl create -f - --dry-run
+W0920 16:50:19.824426    1486 helpers.go:555] --dry-run is deprecated and can be replaced with --dry-run=client.
+rolebinding.rbac.authorization.k8s.io/modify-pods-to-sa created (dry run)
+root@ip-172-31-36-152:~# echo "apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: modify-pods-to-sa
+subjects:
+  - kind: ServiceAccount
+    name: internal-kubectl
+  - kind: ServiceAccount
+    name: shanu
+roleRef:
+  kind: Role
+  name: list-pods
+  apiGroup: rbac.authorization.k8s.io" | kubectl create -f -
+rolebinding.rbac.authorization.k8s.io/modify-pods-to-sa created
+root@ip-172-31-36-152:~#
+
+
+root@ip-172-31-36-152:~# kubectl get rolebinding.rbac.authorization.k8s.io
+NAME                ROLE             AGE
+modify-pods-to-sa   Role/list-pods   68s
+
+
+
+root@ip-172-31-36-152:~# kubectl describe rolebinding.rbac.authorization.k8s.io modify-pods-to-sa
+Name:         modify-pods-to-sa
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  list-pods
+Subjects:
+  Kind            Name              Namespace
+  ----            ----              ---------
+  ServiceAccount  internal-kubectl
+  ServiceAccount  shanu

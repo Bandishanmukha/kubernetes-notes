@@ -1,0 +1,320 @@
+class-9
+replicacontroller
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: nginx
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+c     spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+
+-----------------------------------------------------------
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: nginx
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v1
+        ports:
+        - containerPort: 80
+kubectl apply -f rc.yml
+kubectl get pods
+kubectl get rc
+kubectl describe rc nginx
+kubectl delete rc nginx
+kubectl get pods
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v1
+        ports:
+        - containerPort: 80
+
+kubectl apply -f rc.yml
+kubectl get pods
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-2lm7n   1/1     Running   0          46s
+superstar-4nfhz   1/1     Running   0          46s
+superstar-qlrfg   1/1     Running   0          46s
+
+
+kubectl get pod superstar-4nfhz -o yaml
+
+kubectl get pods -o wide
+
+
+I need to increase size of replica 3 to 4
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 4
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v1
+        ports:
+        - containerPort: 80
+
+kubectl get rc
+root@ip-172-31-24-186:~/testdp# kubectl get rc
+NAME        DESIRED   CURRENT   READY   AGE
+superstar   3         3         3       9m2s
+root@ip-172-31-24-186:~/testdp# kubectl edit rc superstart
+
+
+root@ip-172-31-24-186:~/testdp# kubectl edit rc superstar
+replicationcontroller/superstar edited
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-2lm7n   1/1     Running   0          11m
+superstar-4nfhz   1/1     Running   0          11m
+superstar-5b658   1/1     Running   0          27s
+superstar-qlrfg   1/1     Running   0          11m
+
+
+real time lo dont use this methodology
+
+
+sometimes one pod reboot regular then we do troubleshoot how??
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods --show-labels
+NAME              READY   STATUS    RESTARTS   AGE    LABELS
+superstar-2lm7n   1/1     Running   0          14m    app=nginx
+superstar-4nfhz   1/1     Running   0          14m    app=nginx
+superstar-5b658   1/1     Running   0          4m3s   app=nginx
+superstar-qlrfg   1/1     Running   0          14m    app=nginx
+
+
+tmux
+ctrl+b+shift+% open terminal
+ctrl+b shift <--
+
+ctl+b shift -->
+
+
+root@ip-172-31-24-186:~/testdp# watch -n 1 kubectl get pods --show-labels     │root@ip-172-31-24-186:~/testdp#
+
+
+kubectl label pod superstar-21m7n app-
+
+Every 1.0s: kubectl get pods --...  ip-172-31-24-186: Tue Sep  7 14:41:13 2021│root@ip-172-31-24-186:~/testdp# kubectl label superstar-2lm7n app-
+                                                                              │error: the server doesn't have a resource type "superstar-2lm7n"
+NAME              READY   STATUS    RESTARTS   AGE   LABELS                   │root@ip-172-31-24-186:~/testdp# kubectl label pod superstar-2lm7n app-
+superstar-2lm7n   1/1     Running   0          27m   <none>                   │pod/superstar-2lm7n labeled
+superstar-4nfhz   1/1     Running   0          27m   app=nginx                │root@ip-172-31-24-186:~/testdp#
+superstar-5b658   1/1     Running   0          16m   app=nginx                │
+superstar-kk5jb   1/1     Running   0          80s   app=nginx                │
+superstar-qlrfg   1/1     Running   0          27m   app=nginx                │
+
+
+here we remove superstar-2lm7n pod in nginx so here they sooo none
+
+
+root@ip-172-31-24-186:~/testdp# kubectl exec -it superstar-2lm7n -- bash
+root@superstar-2lm7n:/#    exit    if we do any trouble shoot we do here
+
+
+Every 1.0s: kubectl get pods --...  ip-172-31-24-186: Tue Sep  7 14:45:30 2021│root@ip-172-31-24-186:~/testdp# kubectl label pod superstar-2lm7n app=nginx
+                                                                              │pod/superstar-2lm7n labeled
+NAME              READY   STATUS        RESTARTS   AGE     LABELS             │root@ip-172-31-24-186:~/testdp#
+superstar-2lm7n   1/1     Running       0          31m     app=nginx          │
+superstar-4nfhz   1/1     Running       0          31m     app=nginx          │
+superstar-5b658   1/1     Running       0          20m     app=nginx          │
+superstar-kk5jb   0/1     Terminating   0          5m37s   app=nginx          │
+superstar-qlrfg   1/1     Running       0          31m     app=nginx
+
+
+
+Every 1.0s: kubectl get pods --...  ip-172-31-24-186: Tue Sep  7 14:50:28 2021│root@ip-172-31-24-186:~/testdp# kubectl run pod --image=sreeharshav/rollingupd
+                                                                              │ate:v3
+NAME              READY   STATUS    RESTARTS   AGE   LABELS                   │pod/pod created
+pod               1/1     Running   0          15s   run=pod                  │root@ip-172-31-24-186:~/testdp#
+superstar-2lm7n   1/1     Running   0          36m   app=nginx                │
+superstar-4nfhz   1/1     Running   0          36m   app=nginx                │
+superstar-5b658   1/1     Running   0          25m   app=nginx                │
+superstar-qlrfg   1/1     Running   0          36m   app=nginx                │
+
+
+add pod into nginx
+
+Every 1.0s: kubectl get pods --...  ip-172-31-24-186: Tue Sep  7 14:52:14 2021│root@ip-172-31-24-186:~/testdp# kubectl run pod --image=sreeharshav/rollingupd
+                                                                              │ate:v3
+NAME              READY   STATUS    RESTARTS   AGE   LABELS                   │pod/pod created
+superstar-2lm7n   1/1     Running   0          38m   app=nginx                │root@ip-172-31-24-186:~/testdp# ^C
+superstar-4nfhz   1/1     Running   0          38m   app=nginx                │root@ip-172-31-24-186:~/testdp# kubectl label pod pod app=nginx
+superstar-5b658   1/1     Running   0          27m   app=nginx                │pod/pod labeled
+superstar-qlrfg   1/1     Running   0          38m   app=nginx                │root@ip-172-31-24-186:~/testdp#
+                                                                              │
+
+kubectl get pod superstar-4nfhz -o yaml
+
+  ownerReferences:
+  - apiVersion: v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicationController
+    name: superstar
+    uid: 68a7432b-e1dd-4959-8b57-ecb308adcb16
+
+
+every pod have same information for replica controller
+
+adey mannam manual ga create chaisina pod {pod               1/1     Running   0          15s   run=pod}
+
+andulo replica set vuntadi
+
+
+root@ip-172-31-24-186:~/testdp# kubectl get rc
+NAME        DESIRED   CURRENT   READY   AGE
+superstar   4         4         4       50m
+root@ip-172-31-24-186:~/testdp# kubectl expose rc superstar --port=8000 --target-port=80 --type=NodePort
+service/superstar exposed
+
+
+root@ip-172-31-24-186:~/testdp# kubectl get svc
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+kubernetes   ClusterIP   100.64.0.1     <none>        443/TCP          64m
+superstar    NodePort    100.71.23.11   <none>        8000:31222/TCP   25s
+
+
+http://3.142.194.230:31222/
+
+i need to change image 
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 4
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+root@ip-172-31-24-186:~/testdp# kubectl apply -f rc.yml
+replicationcontroller/superstar configured
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-2lm7n   1/1     Running   0          57m
+superstar-4nfhz   1/1     Running   0          57m
+superstar-5b658   1/1     Running   0          46m
+superstar-qlrfg   1/1     Running   0          57m
+
+
+kubectl get pods -0 yaml
+
+  spec:
+    containers:
+    - image: index.docker.io/sreeharshav/rollingupdate:v1
+      imagePullPolicy: IfNotPresent
+      name: nginx
+      ports:
+      - containerPort: 80
+        protocol: TCP
+
+here not update
+
+
+kubectl delete pod
+
+again its came why
+
+kubectl get all
+
+
+using run command they created deployement
+
+
+dry run
+pending 43:19 sec
+
+
+invidual pod running
+
+kubectl run --generator=run-pod/v1 testpod --image=index.docker.io/sreeharshav/rollingupdate:v3
+
+
+root@ip-172-31-24-186:~/testdp# kubectl delete pod superstar-2lm7n superstar-4nfhz superstar-5b658 superstar-qlrfg
+pod "superstar-2lm7n" deleted
+pod "superstar-4nfhz" deleted
+pod "superstar-5b658" deleted
+pod "superstar-qlrfg" deleted
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-89gx7   1/1     Running   0          15s
+superstar-gcx5x   1/1     Running   0          15s
+superstar-kqfxz   1/1     Running   0          15s
+superstar-x59sq   1/1     Running   0          15s

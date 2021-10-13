@@ -1,0 +1,652 @@
+Deployements
+
+problem facinng in replica sets
+
+time kubectl get pod -o wide | wc -l
+
+
+cat rc.yml
+
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 4
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v1
+        ports:
+        - containerPort: 80
+
+
+we have different methods for deployement for version
+
+
+
+spinning up new pods and then deleting the old ones
+
+1. we have change version in pod.yml alredy they Replicationcontroller
+2. pod.yml template is changed with updated version but doent apply the pod
+3. we deleted manually existing pods within few sec replication role is added and add new updated pods
+4. but havving short time downtime
+
+2. Switching From the Old to the New Version at once (Blue-green)
+
+
+please follow below fig
+
+            service
+              |
+       |------
+pod v1__pod v2__pod v3       pod:v2 pod:v2 pod:V2
+ |_______|_______|            |        |     |
+Replication controller        ----------------
+ v1                                   |  
+                      
+pod templete v1  
+
+
+1. already service will attached pod v1
+2.  we created another pod v2 templete
+3.  detached existig service to the existing pod v1 template
+4. atached existing service attached to the new pod v2 template
+
+
+Rolling Update
+1. step by step pod are deleted and created updated versions
+2. pods will replaced
+
+------------------------------------------------------------------------------
+step:1 spinning up new pods and then deleting the old ones
+
+vi rc.yml
+
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+
+root@ip-172-31-24-186:~/testdp# kubectl create -f rc.yml
+replicationcontroller/superstar created
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-626ds   1/1     Running   0          10s
+superstar-9drtb   1/1     Running   0          10s
+superstar-dql5h   1/1     Running   0          10s
+root@ip-172-31-24-186:~/testdp#
+
+root@ip-172-31-24-186:~/testdp# kubectl delete rc superstar
+replicationcontroller "superstar" deleted
+
+i need to delete rc becaze i give wrong version
+
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v1
+        ports:
+        - containerPort: 80
+
+root@ip-172-31-24-186:~/testdp# kubectl create -f rc.yml
+replicationcontroller/superstar created
+
+how to delete service
+kubectl get svc
+
+kubectl delete svc superstar
+need to give service this version how??
+
+root@ip-172-31-24-186:~/testdp# kubectl expose rc superstar --port=8000 --target-port=80 --type=NodePort
+service/superstar exposed
+delete : 
+root@ip-172-31-24-186:~/testdp# kubectl delete svc superstar
+service "superstar" deleted
+
+
+root@ip-172-31-24-186:~/testdp# kubectl expose rc superstar --port=8000 --target-port=80 --type=NodePort
+service/superstar exposed
+
+i need to change v1 to v2
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+
+kubectl apply -f rc.yml
+
+
+root@ip-172-31-24-186:~/testdp# kubectl apply -f rc.yml
+Warning: resource replicationcontrollers/superstar is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+replicationcontroller/superstar configured
+
+
+root@ip-172-31-24-186:~/testdp# kubectl describe rc superstar
+Name:         superstar
+Namespace:    default
+Selector:     app=nginx
+Labels:       app=nginx
+Annotations:  <none>
+Replicas:     3 current / 3 desired
+Pods Status:  3 Running / 0 Waiting / 0 Succeeded / 0 Failed
+Pod Template:
+  Labels:  app=nginx
+  Containers:
+   nginx:
+    Image:        index.docker.io/sreeharshav/rollingupdate:v3
+    Port:         80/TCP
+    Host Port:    0/TCP
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Events:
+  Type    Reason            Age   From                    Message
+  ----    ------            ----  ----                    -------
+  Normal  SuccessfulCreate  30m   replication-controller  Created pod: superstar-vx4mx
+  Normal  SuccessfulCreate  30m   replication-controller  Created pod: superstar-q44mr
+  Normal  SuccessfulCreate  30m   replication-controller  Created pod: superstar-xtzrs
+
+
+still not update hre image
+
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-q44mr   1/1     Running   0          32m
+superstar-vx4mx   1/1     Running   0          32m
+superstar-xtzrs   1/1     Running   0          32m
+root@ip-172-31-24-186:~/testdp# kubectl delete pod superstar-q44mr
+pod "superstar-q44mr" deleted
+root@ip-172-31-24-186:~/testdp# kubectl get pod
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-k69rd   1/1     Running   0          17s
+superstar-vx4mx   1/1     Running   0          33m
+superstar-xtzrs   1/1     Running   0          33m
+root@ip-172-31-24-186:~/testdp# kubectl describe rc superstar
+Name:         superstar
+Namespace:    default
+Selector:     app=nginx
+Labels:       app=nginx
+Annotations:  <none>
+Replicas:     3 current / 3 desired
+Pods Status:  3 Running / 0 Waiting / 0 Succeeded / 0 Failed
+Pod Template:
+  Labels:  app=nginx
+  Containers:
+   nginx:
+    Image:        index.docker.io/sreeharshav/rollingupdate:v3
+    Port:         80/TCP
+    Host Port:    0/TCP
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Events:
+  Type    Reason            Age   From                    Message
+  ----    ------            ----  ----                    -------
+  Normal  SuccessfulCreate  33m   replication-controller  Created pod: superstar-vx4mx
+  Normal  SuccessfulCreate  33m   replication-controller  Created pod: superstar-q44mr
+  Normal  SuccessfulCreate  33m   replication-controller  Created pod: superstar-xtzrs
+  Normal  SuccessfulCreate  32s   replication-controller  Created pod: superstar-k69rd
+
+
+here 32 sec they created another one
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-k69rd   1/1     Running   0          3m6s
+superstar-vx4mx   1/1     Running   0          35m
+superstar-xtzrs   1/1     Running   0          35m
+root@ip-172-31-24-186:~/testdp# kubectl delete pod superstar-vx4mx superstar-xtzrs
+pod "superstar-vx4mx" deleted
+pod "superstar-xtzrs" deleted
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-6tb9d   1/1     Running   0          15s
+superstar-k69rd   1/1     Running   0          3m41s
+superstar-sgsg7   1/1     Running   0          15s
+root@ip-172-31-24-186:~/testdp#
+
+here i deleted all pods it was updated
+
+i need to reverted HOw??
+
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+
+
+root@ip-172-31-24-186:~/testdp# kubectl apply -f rc.yml
+replicationcontroller/superstar configured
+root@ip-172-31-24-186:~/testdp# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-6tb9d   1/1     Running   0          6m14s
+superstar-k69rd   1/1     Running   0          9m40s
+superstar-sgsg7   1/1     Running   0          6m14s
+root@ip-172-31-24-186:~/testdp# kubectl delete pod superstar-6tb9d superstar-k69rd
+pod "superstar-6tb9d" deleted
+pod "superstar-k69rd" deleted
+
+root@ip-172-31-24-186:~/testdp# kubectl delete pod superstar-sgsg7
+pod "superstar-sgsg7" deleted
+root@ip-172-31-24-186:~/testdp#
+
+curl ip:portnum in cmd pmot
+----------------------
+i need to delete all and when to Blue-gree
+
+root@ip-172-31-24-186:~/testdp# kubectl get all
+NAME                  READY   STATUS    RESTARTS   AGE
+pod/superstar-6brfg   1/1     Running   0          6m8s
+pod/superstar-dl475   1/1     Running   0          4m57s
+pod/superstar-vmlcd   1/1     Running   0          6m8s
+
+NAME                              DESIRED   CURRENT   READY   AGE
+replicationcontroller/superstar   3         3         3       48m
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+service/kubernetes   ClusterIP   100.64.0.1     <none>        443/TCP          137m
+service/superstar    NodePort    100.69.25.45   <none>        8000:30379/TCP   26m
+root@ip-172-31-24-186:~/testdp# kubectl delete rc superstar
+replicationcontroller "superstar" deleted
+root@ip-172-31-24-186:~/testdp# kubectl delete svc superstar
+service "superstar" deleted
+root@ip-172-31-24-186:~/testdp# kubectl get all
+NAME                  READY   STATUS        RESTARTS   AGE
+pod/superstar-6brfg   1/1     Terminating   0          6m46s
+pod/superstar-dl475   1/1     Terminating   0          5m35s
+pod/superstar-vmlcd   1/1     Terminating   0          6m46s
+
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   100.64.0.1   <none>        443/TCP   137m
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+Step: Blue-green
+
+vi rc.yml
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 2
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v1
+        ports:
+        - containerPort: 80
+
+vi rc2.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 2
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+
+root@ip-172-31-24-186:~/testdp# kubectl create -f rc.yml
+replicationcontroller/superstar created
+
+kubectl get pods
+
+kubectl expose rc superstar --port=8000 --target-port=80 --type=NodePort
+
+root@ip-172-31-24-186:~/testdp# kubectl get all
+NAME                  READY   STATUS    RESTARTS   AGE
+pod/superstar-ppr9w   1/1     Running   0          108s
+pod/superstar-vr2j7   1/1     Running   0          108s
+
+NAME                              DESIRED   CURRENT   READY   AGE
+replicationcontroller/superstar   2         2         2       108s
+
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP          146m
+service/superstar    NodePort    100.69.129.38   <none>        8000:32529/TCP   10s
+
+
+
+kubectl edit svc superstar
+
+
+vi rc2.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar2
+spec:
+  replicas: 2
+  selector:
+    app: nginx2
+  template:
+    metadata:
+      name: nginx2
+      labels:
+        app: nginx2
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+
+root@ip-172-31-24-186:~/testdp# kubectl create -f rc2.yml
+replicationcontroller/superstar2 created
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods --show-labels
+NAME               READY   STATUS    RESTARTS   AGE     LABELS
+superstar-ppr9w    1/1     Running   0          9m39s   app=nginx
+superstar-vr2j7    1/1     Running   0          9m39s   app=nginx
+superstar2-mkf52   1/1     Running   0          33s     app=nginx2
+superstar2-mnls6   1/1     Running   0          33s     app=nginx2
+
+
+root@ip-172-31-24-186:~/testdp# kubectl expose rc superstar2 --port=9000 --target-port=80 --type=NodePort
+service/superstar2 exposed
+root@ip-172-31-24-186:~/testdp# kubectl get svc
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP          155m
+superstar    NodePort    100.69.129.38   <none>        8000:32529/TCP   9m49s
+superstar2   NodePort    100.69.71.241   <none>        9000:32349/TCP   12s
+
+
+this Blue green deployement here i delete superstar svc and attached superstar2 svc into dns
+
+
+this is one process in Blue-gree deployement
+
+i deleted superstar2 svc
+
+root@ip-172-31-24-186:~/testdp# kubectl delete svc superstar2
+service "superstar2" deleted
+
+
+root@ip-172-31-24-186:~/testdp# kubectl get all
+NAME                   READY   STATUS    RESTARTS   AGE
+pod/superstar-ppr9w    1/1     Running   0          18m
+pod/superstar-vr2j7    1/1     Running   0          18m
+pod/superstar2-mkf52   1/1     Running   0          8m54s
+pod/superstar2-mnls6   1/1     Running   0          8m54s
+
+NAME                               DESIRED   CURRENT   READY   AGE
+replicationcontroller/superstar    2         2         2       18m
+replicationcontroller/superstar2   2         2         2       8m54s
+
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP          162m
+service/superstar    NodePort    100.69.129.38   <none>        8000:32529/TCP   16m
+
+delete all
+
+-------------------------------------------------------------------------------------------------------------
+
+step:3 
+Rolling Update
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 3
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v1
+        ports:
+        - containerPort: 80
+
+
+root@ip-172-31-24-186:~/testdp# kubectl create -f rc.yml
+replicationcontroller/superstar created
+
+root@ip-172-31-24-186:~/testdp# kubectl expose rc superstar --port=8000 --target-port=80 --type=NodePort
+service/superstar exposed
+root@ip-172-31-24-186:~/testdp# kubectl get all
+NAME                  READY   STATUS    RESTARTS   AGE
+pod/superstar-7sqmf   1/1     Running   0          58s
+pod/superstar-rxcnj   1/1     Running   0          58s
+pod/superstar-vgv96   1/1     Running   0          58s
+
+NAME                              DESIRED   CURRENT   READY   AGE
+replicationcontroller/superstar   3         3         3       58s
+
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP          179m
+service/superstar    NodePort    100.65.53.253   <none>        8000:30674/TCP   12s
+root@ip-172-31-24-186:~/testdp#
+
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods --v 1
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-7sqmf   1/1     Running   0          3m4s
+superstar-rxcnj   1/1     Running   0          3m4s
+superstar-vgv96   1/1     Running   0          3m4s
+root@ip-172-31-24-186:~/testdp# kubectl get pods --v 2
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-7sqmf   1/1     Running   0          3m8s
+superstar-rxcnj   1/1     Running   0          3m8s
+superstar-vgv96   1/1     Running   0          3m8s
+root@ip-172-31-24-186:~/testdp# kubectl get pods --v 3
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-7sqmf   1/1     Running   0          3m11s
+superstar-rxcnj   1/1     Running   0          3m11s
+superstar-vgv96   1/1     Running   0          3m11s
+root@ip-172-31-24-186:~/testdp# kubectl get pods --v 4
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-7sqmf   1/1     Running   0          3m14s
+superstar-rxcnj   1/1     Running   0          3m14s
+superstar-vgv96   1/1     Running   0          3m14s
+root@ip-172-31-24-186:~/testdp# kubectl get pods --v 5
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-7sqmf   1/1     Running   0          3m18s
+superstar-rxcnj   1/1     Running   0          3m18s
+superstar-vgv96   1/1     Running   0          3m18s
+root@ip-172-31-24-186:~/testdp# kubectl get pods --v 6
+I0908 16:33:48.942204    1792 loader.go:372] Config loaded from file:  /root/.kube/config
+I0908 16:33:48.966336    1792 round_trippers.go:454] GET https://api.kiwidev.xyz/api/v1/namespaces/default/pods?limit=500 200 OK in 14 milliseconds
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-7sqmf   1/1     Running   0          3m21s
+superstar-rxcnj   1/1     Running   0          3m21s
+superstar-vgv96   1/1     Running   0          3m21s
+
+
+v means verboast
+
+root@ip-172-31-24-186:~/testdp# kubectl get svc --v 6
+I0908 16:35:03.569809    1800 loader.go:372] Config loaded from file:  /root/.kube/config
+I0908 16:35:03.598033    1800 round_trippers.go:454] GET https://api.kiwidev.xyz/api/v1/namespaces/default/services?limit=500 200 OK in 22 milliseconds
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP          3h3m
+superstar    NodePort    100.65.53.253   <none>        8000:30674/TCP   3m50s
+
+root@ip-172-31-24-186:~/testdp# kubectl get pods -n kube-system --v 6
+I0908 16:36:03.750338    1811 loader.go:372] Config loaded from file:  /root/.kube/config
+I0908 16:36:03.774903    1811 round_trippers.go:454] GET https://api.kiwidev.xyz/api/v1/namespaces/kube-system/pods?limit=500 200 OK in 18 milliseconds
+NAME                                                                  READY   STATUS    RESTARTS   AGE
+coredns-autoscaler-6f594f4c58-ftx65                                   1/1     Running   0          3h4m
+coredns-f45c4bf76-5nstf                                               1/1     Running   0          3h2m
+coredns-f45c4bf76-rckw8                                               1/1     Running   0          3h4m
+dns-controller-b9956d4b5-zwpjj                                        1/1     Running   0          3h4m
+etcd-manager-events-ip-172-20-33-242.us-east-2.compute.internal       1/1     Running   0          3h2m
+etcd-manager-main-ip-172-20-33-242.us-east-2.compute.internal         1/1     Running   0          3h3m
+kops-controller-9xnbs                                                 1/1     Running   0          3h4m
+kube-apiserver-ip-172-20-33-242.us-east-2.compute.internal            2/2     Running   2          3h3m
+kube-controller-manager-ip-172-20-33-242.us-east-2.compute.internal   1/1     Running   0          3h3m
+kube-proxy-ip-172-20-33-242.us-east-2.compute.internal                1/1     Running   0          3h2m
+kube-proxy-ip-172-20-44-33.us-east-2.compute.internal                 1/1     Running   0          3h2m
+kube-proxy-ip-172-20-54-108.us-east-2.compute.internal                1/1     Running   0          3h2m
+kube-scheduler-ip-172-20-33-242.us-east-2.compute.internal            1/1     Running   0          3h2m
+root@ip-172-31-24-186:~/testdp#
+
+
+backend lo mm jargtundo jargidi
+
+using for trouble shoot
+
+kubectl --help
+
+root@ip-172-31-24-186:~/testdp# kubectl rollout --help
+Manage the rollout of a resource.
+
+ Valid resource types include:
+
+  *  deployments
+  *  daemonsets
+  *  statefulsets
+
+Examples:
+  # Rollback to the previous deployment
+  kubectl rollout undo deployment/abc
+
+  # Check the rollout status of a daemonset
+  kubectl rollout status daemonset/foo
+
+Available Commands:
+  history     View rollout history
+  pause       Mark the provided resource as paused
+  restart     Restart a resource
+  resume      Resume a paused resource
+  status      Show the status of the rollout
+  undo        Undo a previous rollout
+
+Usage:
+  kubectl rollout SUBCOMMAND [options]
+
+Use "kubectl <command> --help" for more information about a given command.
+Use "kubectl options" for a list of global command-line options (applies to all commands).
+root@ip-172-31-24-186:~/testdp#
+
+
+
+root@ip-172-31-24-186:~/testdp# kubectl rolling-update superstar superstar2 --image=index.docker.io/sreeharshav/testcontainer:v1
+Error: unknown command "rolling-update" for "kubectl"
+Run 'kubectl --help' for usage.
+root@ip-172-31-24-186:~/testdp# kubectl rolling-update --help
+Error: unknown command "rolling-update" for "kubectl"
+Run 'kubectl --help' for usage.
+  rollling-update noot availlable
+
+follow this
+
+https://acloudguru.com/hands-on-labs/performing-a-rolling-update-of-an-application-in-kubernetes
+
+
+ 

@@ -1,0 +1,280 @@
+
+                 RC----------------------------|
+                                               |
+continer   pod -----------Deployement---------service               inernet
+                                                |
+                 RS-----------------------------|
+
+
+
+service
+
+--clusterip
+--Nodeport
+--Ingress
+--None
+
+
+
+* first i create one pod
+
+root@ip-172-31-36-152:~# kubectl get nodes
+NAME                                           STATUS   ROLES                  AGE   VERSION
+ip-172-20-39-106.ap-south-1.compute.internal   Ready    node                   13m   v1.20.10
+ip-172-20-39-79.ap-south-1.compute.internal    Ready    node                   13m   v1.20.10
+ip-172-20-48-95.ap-south-1.compute.internal    Ready    control-plane,master   15m   v1.20.10
+
+
+root@ip-172-31-36-152:~# kubectl run pod1 --image=index.docker.io/sreeharshav/rollingupdate:v3
+pod/pod1 created
+root@ip-172-31-36-152:~# kubectl get pods
+NAME   READY   STATUS              RESTARTS   AGE
+pod1   0/1     ContainerCreating   0          5s
+root@ip-172-31-36-152:~# kubectl get pods
+NAME   READY   STATUS              RESTARTS   AGE
+pod1   0/1     ContainerCreating   0          8s
+root@ip-172-31-36-152:~# kubectl get pods
+NAME   READY   STATUS    RESTARTS   AGE
+pod1   1/1     Running   0          13s
+
+
+ kubectl describe pod pod1
+Name:         pod1
+Namespace:    default
+Priority:     0
+Node:         ip-172-20-39-79.ap-south-1.compute.internal/172.20.39.79
+Start Time:   Tue, 14 Sep 2021 14:06:30 +0000
+Labels:       run=pod1
+Annotations:  kubernetes.io/limit-ranger: LimitRanger plugin set: cpu request for container pod1
+Status:       Running
+IP:           100.96.1.4
+
+
+ip will assign
+
+
+svc will provide
+
+NodePort
+ClusterPort
+Load Balancer
+None(Headless Service)
+Ingress
+
+root@ip-172-31-36-152:~# kubectl expose pod/pod1 --port=8000 --target-port=80
+service/pod1 exposed
+root@ip-172-31-36-152:~# kubectl get all
+NAME       READY   STATUS    RESTARTS   AGE
+pod/pod1   1/1     Running   0          18m
+
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP    42m
+service/pod1         ClusterIP   100.70.70.192   <none>        8000/TCP   5s
+root@ip-172-31-36-152:~#
+
+
+here above iam not mentioned any service it take by default clusterip
+
+for internal communication purpose we use cluster ip
+
+we have diff pod like oe application and on db   so here db pod expose with cluster ip
+
+-------------------------------------
+
+ubuntu@ip-172-20-48-95:~$ kubectl describe  svc pod1
+Name:              pod1
+Namespace:         default
+Labels:            run=pod1
+Annotations:       <none>
+Selector:          run=pod1
+Type:              ClusterIP
+IP Families:       <none>
+IP:                100.70.70.192
+IPs:               100.70.70.192
+Port:              <unset>  8000/TCP
+TargetPort:        80/TCP
+Endpoints:         100.96.1.4:80
+Session Affinity:  None
+Events:            <none>
+
+
+ubuntu@ip-172-20-48-95:~$ kubectl create service clusterip svc2 --tcp=9000:80
+service/svc2 created
+
+
+service created
+
+
+ubuntu@ip-172-20-48-95:~$ kubectl get svc
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP    88m
+pod1         ClusterIP   100.70.70.192   <none>        8000/TCP   46m
+svc2         ClusterIP   100.65.167.27   <none>        9000/TCP   32s
+ubuntu@ip-172-20-48-95:~$ kubectl describe svc svc2
+Name:              svc2
+Namespace:         default
+Labels:            app=svc2
+Annotations:       <none>
+Selector:          app=svc2
+Type:              ClusterIP
+IP Families:       <none>
+IP:                100.65.167.27
+IPs:               100.65.167.27
+Port:              9000-80  9000/TCP
+TargetPort:        80/TCP
+Endpoints:         <none>
+Session Affinity:  None
+Events:            <none>
+
+
+end point is nothere becsuse we doent create pods
+
+
+ubuntu@ip-172-20-48-95:~$ kubectl get svc
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+kubernetes   ClusterIP   100.64.0.1      <none>        443/TCP    91m
+pod1         ClusterIP   100.70.70.192   <none>        8000/TCP   48m
+svc2         ClusterIP   100.65.167.27   <none>        9000/TCP   3m
+ubuntu@ip-172-20-48-95:~$ kubectl delete svc svc2
+service "svc2" deleted
+
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 4
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+
+kubectl create -f rc.yml
+
+
+root@ip-172-31-36-152:~# kubectl expose rc superstar --port=9000 --target-port=80
+service/superstar exposed
+
+
+Name:              superstar
+Namespace:         default
+Labels:            app=nginx
+Annotations:       <none>
+Selector:          app=nginx
+Type:              ClusterIP
+IP Families:       <none>
+IP:                100.65.205.171
+IPs:               100.65.205.171
+Port:              <unset>  9000/TCP
+TargetPort:        80/TCP
+Endpoints:         100.96.1.7:80,100.96.1.8:80,100.96.2.5:80 + 1 more...
+Session Affinity:  None
+
+
+root@ip-172-31-36-152:~# kubectl describe pod superstar-564q4 | grep -i '100.'
+IP:           100.96.1.8
+  IP:           100.96.1.8
+      cpu:        100m
+
+
+i need to expose outside how
+using NodePort/Loadbalancer/Ingress
+
+
+root@ip-172-31-36-152:~# kubectl expose rc superstar --name=superstar2 --port=8080 --target-port=80 --type=NodePort
+service/superstar2 exposed
+
+
+edit image chage image
+
+root@ip-172-31-36-152:~# kubectl edit rc superstar
+replicationcontroller/superstar edited
+
+
+root@ip-172-31-36-152:~# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-564q4   1/1     Running   0          36m
+superstar-lfdln   1/1     Running   0          36m
+superstar-wk4f2   1/1     Running   0          36m
+superstar-zt2jr   1/1     Running   0          36m
+root@ip-172-31-36-152:~# kubectl delete pod superstar-564q4
+pod "superstar-564q4" deleted
+root@ip-172-31-36-152:~# kubectl get pods
+NAME              READY   STATUS              RESTARTS   AGE
+superstar-gfpqm   0/1     ContainerCreating   0          8s
+superstar-lfdln   1/1     Running             0          37m
+superstar-wk4f2   1/1     Running             0          37m
+superstar-zt2jr   1/1     Running             0          37m
+root@ip-172-31-36-152:~# kubectl delete pod superstar-lfdln
+pod "superstar-lfdln" deleted
+root@ip-172-31-36-152:~# kubectl delete pod superstar-wk4f2
+pod "superstar-wk4f2" deleted
+root@ip-172-31-36-152:~# kubectl delete pod superstar-zt2jr
+pod "superstar-zt2jr" deleted
+root@ip-172-31-36-152:~# kubectl get pods
+NAME              READY   STATUS    RESTARTS   AGE
+superstar-gfpqm   1/1     Running   0          59s
+superstar-glbpd   1/1     Running   0          24s
+superstar-jgcb8   1/1     Running   0          35s
+superstar-wpnjt   1/1     Running   0          7s
+
+
+
+in cmd promt
+
+
+$ while true
+> do
+> curl -sL http:http://13.233.4.199:30760/  grep -i "IP A"
+> sleep 1
+> done
+
+
+
+now i created Load balancer
+
+root@ip-172-31-36-152:~# kubectl expose rc superstar --name=lbexpose --port=80 --target-port=80 --type=LoadBalancer
+service/lbexpose exposed
+
+
+--------------------------------------------------
+
+now i created headless
+
+root@ip-172-31-36-152:~# kubectl expose rc superstar --name=headless --port=8100 --target-port=80 --cluster-ip=None
+service/headless exposed
+root@ip-172-31-36-152:~# kubectl get all
+NAME                  READY   STATUS    RESTARTS   AGE
+pod/superstar-gfpqm   1/1     Running   0          37m
+pod/superstar-glbpd   1/1     Running   0          37m
+pod/superstar-jgcb8   1/1     Running   0          37m
+pod/superstar-wpnjt   1/1     Running   0          36m
+
+NAME                              DESIRED   CURRENT   READY   AGE
+replicationcontroller/superstar   4         4         4       74m
+
+NAME                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/headless     ClusterIP      None            <none>        8100/TCP         6s
+service/kubernetes   ClusterIP      100.64.0.1      <none>        443/TCP          176m
+service/lbexpose2    LoadBalancer   100.67.229.27   <pending>     80:30023/TCP     62s
+service/superstar    ClusterIP      100.65.39.205   <none>        9000/TCP         51m
+service/superstar2   NodePort       100.68.46.41    <none>        8080:30760/TCP   51m
+
+
+
+
+1:23 mins stop section

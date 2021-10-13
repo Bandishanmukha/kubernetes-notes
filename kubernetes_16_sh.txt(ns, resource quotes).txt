@@ -1,0 +1,977 @@
+Namespaces   --> similar to vpc
+cluster ni virtualga divide chaistadi
+
+1. we can provide access based on namespace
+2. can apply quotas on the namespaces
+
+
+login maanagement server
+
+
+root@ip-172-31-36-152:~# kubectl get ns
+NAME              STATUS   AGE
+default           Active   18m     default
+kube-node-lease   Active   18m    
+kube-public       Active   18m     to expose data outside
+kube-system       Active   18m    all kubernetes
+
+
+we created custom ns
+
+root@ip-172-31-36-152:~# kubectl create ns app1
+namespace/app1 created
+
+root@ip-172-31-36-152:~# kubectl create ns app2
+namespace/app2 created
+
+root@ip-172-31-36-152:~# kubectl run hello1 --image=sreeharshav/rollingupdate:v1
+pod/hello1 created
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS              RESTARTS   AGE
+hello1   0/1     ContainerCreating   0          7s
+root@ip-172-31-36-152:~# ^C
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+
+
+root@ip-172-31-36-152:~# kubectl delete pod hello1
+pod "hello1" deleted
+
+
+root@ip-172-31-36-152:~# kubectl run hello1 --image=sreeharshav/rollingupdate:v1 -n app1
+pod/hello1 created
+root@ip-172-31-36-152:~# kubectl get pods
+No resources found in default namespace.
+root@ip-172-31-36-152:~# kubectl get pods -n app1
+NAME     READY   STATUS    RESTARTS   AGE
+hello1   1/1     Running   0          13s
+root@ip-172-31-36-152:~# kubectl delete pod hello1 -n app1
+pod "hello1" deleted
+
+
+search kubens download
+
+
+ wget https://github.com/ahmetb/kubectx/releases/download/v0.9.4/kubens_v0.9.4_linux_x86_64.tar.gz
+
+
+root@ip-172-31-36-152:~# tar -zxvf kubens_v0.9.4_linux_x86_64.tar.gz
+LICENSE
+kubens
+
+
+
+root@ip-172-31-36-152:~# ./kubens
+app1
+app2
+default
+kube-node-lease
+kube-public
+kube-system
+
+
+root@ip-172-31-36-152:~# mv kubens /usr/local/bin/
+
+
+root@ip-172-31-36-152:~# kubens app1
+✔ Active namespace is "app1"
+
+root@ip-172-31-36-152:~# kubens
+app1
+app2
+default
+kube-node-lease
+kube-public
+kube-system
+
+app1 active here 
+
+
+root@ip-172-31-36-152:~# kubectl run hello1 --image=sreeharshav/rollingupdate:v1
+pod/hello1 created
+root@ip-172-31-36-152:~# kubeget pods
+kubeget: command not found
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+hello1   1/1     Running   0          15s
+
+
+root@ip-172-31-36-152:~# kubens "default"
+✔ Active namespace is "default"
+root@ip-172-31-36-152:~# kubeget pods
+kubeget: command not found
+root@ip-172-31-36-152:~# kubectl get pods
+No resources found in default namespace.
+
+
+root@ip-172-31-36-152:~# cp /usr/local/bin/kubens /usr/local/bin/kns
+root@ip-172-31-36-152:~# kubens
+app1
+app2
+default
+kube-node-lease
+kube-public
+kube-system
+root@ip-172-31-36-152:~# kns
+app1
+app2
+default
+kube-node-lease
+kube-public
+kube-system
+
+
+root@ip-172-31-36-152:~# kns app1
+✔ Active namespace is "app1"
+
+
+root@ip-172-31-36-152:~# kubectl get ns -o wide
+NAME              STATUS   AGE
+app1              Active   23m
+app2              Active   23m
+default           Active   43m
+kube-node-lease   Active   43m
+kube-public       Active   43m
+kube-system       Active   43m
+
+
+check google in kubernetes resourcequota
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+No resource quota.
+
+No LimitRange resource.
+root@ip-172-31-36-152:~#
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+ name: count-quotas
+spec:
+ hard:
+   pods: "2"
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+kind: ResourceQuota
+metadata:
+ name: count-quotas
+spec:
+ hard:
+   pods: "2"" | kubectl create -f -
+resourcequota/count-quotas created
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:     count-quotas
+  Resource  Used  Hard
+  --------  ---   ---
+  pods      1     2
+
+No LimitRange resource.
+
+
+root@ip-172-31-36-152:~# kubectl run hello2 --image=sreeharshav/rollingupdate:v1
+pod/hello2 created
+root@ip-172-31-36-152:~# kubectl get pod
+NAME     READY   STATUS              RESTARTS   AGE
+hello1   1/1     Running             0          49m
+hello2   0/1     ContainerCreating   0          7s
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+hello1   1/1     Running   0          49m
+hello2   1/1     Running   0          12s
+root@ip-172-31-36-152:~# kns
+app1
+app2
+default
+kube-node-lease
+kube-public
+kube-system
+root@ip-172-31-36-152
+
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:     count-quotas
+  Resource  Used  Hard
+  --------  ---   ---
+  pods      2     2
+
+No LimitRange resource.
+
+
+now here quoto full i deployed 3 pods what happend...??
+
+
+root@ip-172-31-36-152:~# kubectl run hello3 --image=sreeharshav/rollingupdate:v1
+Error from server (Forbidden): pods "hello3" is forbidden: exceeded quota: count-quotas, requested: pods=1, used: pods=2, limited: pods=2
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+hello1   1/1     Running   0          51m
+hello2   1/1     Running   0          2m22s
+
+
+root@ip-172-31-36-152:~# kubectl get resourcequotas
+NAME           AGE     REQUEST     LIMIT
+count-quotas   7m23s   pods: 2/2
+
+
+root@ip-172-31-36-152:~# kubectl delete resourcequotas count-quotas
+resourcequota "count-quotas" deleted
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+No resource quota.
+
+No LimitRange resource.
+
+
+
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+ name: object-counts
+spec:
+ hard:
+   requests.cpu: "1000m"
+   limits.cpu: "2000m"
+   requests.memory: 1Gi
+   limits.memory: 2Gi
+
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+ name: limits
+spec:
+ limits:
+ - default:
+     cpu: 200m
+     memory: 512Mi
+   defaultRequest:
+     cpu: 100m
+     memory: 256Mi
+   type: Container
+
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+No resource quota.
+
+No LimitRange resource.
+
+
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+ name: object-counts
+spec:
+ hard:
+   requests.cpu: "1000m"
+   limits.cpu: "2000m"
+   requests.memory: 1Gi
+   limits.memory: 2Gi
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+kind: ResourceQuota
+metadata:
+ name: object-counts
+spec:
+ hard:
+   requests.cpu: "1000m"
+   limits.cpu: "2000m"
+   requests.memory: 1Gi
+   limits.memory: 2Gi" |kubectl create -f -
+resourcequota/object-counts created
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used  Hard
+  --------         ---   ---
+  limits.cpu       0     2
+  limits.memory    0     2Gi
+  requests.cpu     0     1
+  requests.memory  0     1Gi
+
+No LimitRange resource.
+root@ip-172-31-36-152:~#
+
+
+above conditon to apply in namespace
+
+38:36 stop video
+----------------------------------------------------------------------------------------------------------------------------------
+
+Limits range
+
+
+root@ip-172-31-36-152:~# 
+echo "apiVersion: v1
+kind: LimitRange
+metadata:
+ name: limits
+spec:
+ limits:
+ - default:
+     cpu: 200m
+     memory: 512Mi
+   defaultRequest:
+     cpu: 100m
+     memory: 256Mi
+   type: Container" | kubectl create -f -
+
+limitrange/limits created
+
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used  Hard
+  --------         ---   ---
+  limits.cpu       0     2
+  limits.memory    0     2Gi
+  requests.cpu     0     1
+  requests.memory  0     1Gi
+
+Resource Limits
+ Type       Resource  Min  Max  Default Request  Default Limit  Max Limit/Request Ratio
+ ----       --------  ---  ---  ---------------  -------------  -----------------------
+ Container  memory    -    -    256Mi            512Mi          -
+ Container  cpu       -    -    100m             200m           -
+
+
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+hello1   1/1     Running   0          95m
+hello2   1/1     Running   0          46m
+root@ip-172-31-36-152:~# kubectl delete pod hello1
+pod "hello1" deleted
+root@ip-172-31-36-152:~# kubectl delete pod hello2
+pod "hello2" deleted
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+ name: nginx1
+spec:
+ containers:
+ - name: nginx1
+   image: sreeharshav/rollingupdate:v1
+   ports:
+   - containerPort: 80
+   resources:
+     limits:
+       cpu: "500m"
+       memory: 256Mi
+
+
+
+-----------------------------------
+
+root@ip-172-31-36-152:~# echo "
+> apiVersion: v1
+> kind: Pod
+> metadata:
+>  name: nginx1
+> spec:
+>  containers:
+>  - name: nginx1
+>    image: sreeharshav/rollingupdate:v1
+>    ports:
+>    - containerPort: 80
+>    resources:
+>      limits:
+>        cpu: "500m"
+>        memory: 256Mi" | kubectl create -f -
+pod/nginx1 created
+
+
+44:03 stop
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used   Hard
+  --------         ---    ---
+  limits.cpu       500m   2
+  limits.memory    256Mi  2Gi
+  requests.cpu     500m   1
+  requests.memory  256Mi  1Gi
+
+Resource Limits
+ Type       Resource  Min  Max  Default Request  Default Limit  Max Limit/Reques                                                                             t Ratio
+ ----       --------  ---  ---  ---------------  -------------  ----------------                                                                             -------
+ Container  cpu       -    -    100m             200m           -
+ Container  memory    -    -    256Mi            512Mi          -
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+nginx1   1/1     Running   0          2m19s
+
+
+kubectl describe pod nginx1
+
+
+ nginx1:
+    Container ID:   containerd://01400cd22782f62c54de2b3dd2840716e5fccb1d5507300150ebbbdf442dec60
+    Image:          sreeharshav/rollingupdate:v1
+    Image ID:       docker.io/sreeharshav/rollingupdate@sha256:6d662ab0c34e5665292470fa206c0e499f61553d6a3b31145e61886d8a8952e6
+    Port:           80/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Sun, 19 Sep 2021 05:43:59 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     500m
+      memory:  256Mi
+    Requests:
+      cpu:        500m
+      memory:     256Mi
+    Environment:  <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-pbfzx (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             True
+  ContainersReady   True
+  PodScheduled      True
+Volumes:
+
+
+consider rquirement if we have cluster 3 masters and 10 nodes  total have 20cpu(20000m)& 80 gb ram
+
+have 4 different ns
+
+ns                         RQ5000m/16gb each ns
+
+app1-ns         RQ5000m/16gb 
+app2-ns         RQ5000m/16gb
+app3-ns         RQ5000m/16gb
+app4-ns         RQ5000m/16gb 
+
+
+
+
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+ name: object-counts
+spec:
+ hard:
+   requests.cpu: "1000m"
+   limits.cpu: "2000m"
+   requests.memory: 1Gi
+   limits.memory: 2Gi
+   pods:  "10"
+   replicationcontrollers: "20"
+   resourcequotas: "10"
+   services: "5"
+
+--------
+
+lab
+
+root@ip-172-31-36-152:~# kubectl get limitranges
+NAME     CREATED AT
+limits   2021-09-19T05:41:25Z
+root@ip-172-31-36-152:~# kubectl delete limitrange limits
+limitrange "limits" deleted
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used   Hard
+  --------         ---    ---
+  limits.cpu       500m   2
+  limits.memory    256Mi  2Gi
+  requests.cpu     500m   1
+  requests.memory  256Mi  1Gi
+
+No LimitRange resource.
+
+------------------------------
+
+this resource will apply only container for particular ns
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limit-mem-cpu-per-container
+spec:
+  limits:
+  - max:
+      cpu: "200m"
+      memory: "128Mi"
+    min:
+      cpu: "100m"
+      memory: "100Mi"
+    type: Container
+
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+> kind: LimitRange
+> metadata:
+>   name: limit-mem-cpu-per-container
+> spec:
+>   limits:
+>   - max:
+>       cpu: "200m"
+>       memory: "128Mi"
+>     min:
+>       cpu: "100m"
+>       memory: "100Mi"
+>     type: Container" | kubectl create -f -
+limitrange/limit-mem-cpu-per-container created
+
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used   Hard
+  --------         ---    ---
+  limits.cpu       500m   2
+  limits.memory    256Mi  2Gi
+  requests.cpu     500m   1
+  requests.memory  256Mi  1Gi
+
+Resource Limits
+ Type       Resource  Min    Max    Default Request  Default Limit  Max Limit/Request Ratio
+ ----       --------  ---    ---    ---------------  -------------  -----------------------
+ Container  cpu       100m   200m   200m             200m           -
+ Container  memory    100Mi  128Mi  128Mi            128Mi          -
+
+
+now we deployed pod
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+ name: nginx1
+spec:
+ containers:
+ - name: nginx1
+   image: sreeharshav/rollingupdate:v1
+   ports:
+   - containerPort: 80
+   resources:
+     limits:
+       cpu: "500m"
+       memory: 256Mi
+
+
+
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+> kind: Pod
+> metadata:
+>  name: nginx1
+> spec:
+>  containers:
+>  - name: nginx1
+>    image: sreeharshav/rollingupdate:v1
+>    ports:
+>    - containerPort: 80
+>    resources:
+>      limits:
+>        cpu: "500m"
+>        memory: 256Mi" | kubectl create -f -
+Error from server (Forbidden): error when creating "STDIN": pods "nginx1" is forbidden: [maximum cpu usage per Container is 200m, but limit is 500m, maximum memory usage per Container is 128Mi, but limit is 256Mi]
+
+
+now i will decresed size of pod
+
+apiVersion: v1
+kind: Pod
+metadata:
+ name: nginx1
+spec:
+ containers:
+ - name: nginx1
+   image: sreeharshav/rollingupdate:v1
+   ports:
+   - containerPort: 80
+   resources:
+     limits:
+       cpu: "100m"
+       memory: 100Mi
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+kind: Pod
+metadata:
+ name: nginx1
+spec:
+ containers:
+ - name: nginx1
+   image: sreeharshav/rollingupdate:v1
+   ports:
+   - containerPort: 80
+   resources:
+     limits:
+       cpu: "100m"
+       memory: 100Mi" | kubectl create -f -
+pod/nginx1 created
+
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used   Hard
+  --------         ---    ---
+  limits.cpu       100m   2
+  limits.memory    100Mi  2Gi
+  requests.cpu     100m   1
+  requests.memory  100Mi  1Gi
+
+Resource Limits
+ Type       Resource  Min    Max    Default Request  Default Limit  Max Limit/Request Ratio
+ ----       --------  ---    ---    ---------------  -------------  -----------------------
+ Container  cpu       100m   200m   200m             200m           -
+ Container  memory    100Mi  128Mi  128Mi            128Mi          -
+root@ip-172-31-36-152:~# kubectl get limitranges
+NAME                          CREATED AT
+limit-mem-cpu-per-container   2021-09-19T06:21:40Z
+
+
+
+root@ip-172-31-36-152:~# kubectl get limitranges
+NAME                          CREATED AT
+limit-mem-cpu-per-container   2021-09-19T06:21:40Z
+root@ip-172-31-36-152:~# ^C
+root@ip-172-31-36-152:~# kubectl delete limitranges limit-mem-cpu-per-container
+limitrange "limit-mem-cpu-per-container" deleted
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used   Hard
+  --------         ---    ---
+  limits.cpu       100m   2
+  limits.memory    100Mi  2Gi
+  requests.cpu     100m   1
+  requests.memory  100Mi  1Gi
+
+No LimitRange resource.
+
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limit-mem-cpu-per-container
+spec:
+  limits:
+  - max:
+      cpu: "200m"
+      memory: "128Mi"
+    min:
+      cpu: "100m"
+      memory: "100Mi"
+    type: Container" | kubectl create -f -
+
+
+root@ip-172-31-36-152:~# kubectl get limitranges
+NAME                          CREATED AT
+limit-mem-cpu-per-container   2021-09-19T06:38:35Z
+
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used   Hard
+  --------         ---    ---
+  limits.cpu       100m   2
+  limits.memory    100Mi  2Gi
+  requests.cpu     100m   1
+  requests.memory  100Mi  1Gi
+
+Resource Limits
+ Type       Resource  Min    Max    Default Request  Default Limit  Max Limit/Request Ratio
+ ----       --------  ---    ---    ---------------  -------------  -----------------------
+ Container  cpu       100m   200m   200m             200m           -
+ Container  memory    100Mi  128Mi  128Mi            128Mi          -
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+nginx1   1/1     Running   0          12m
+root@ip-172-31-36-152:~# kubectl delete pod nginx1
+pod "nginx1" deleted
+
+
+root@ip-172-31-36-152:~# kubectl describe ns app1
+Name:         app1
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            object-counts
+  Resource         Used  Hard
+  --------         ---   ---
+  limits.cpu       0     2
+  limits.memory    0     2Gi
+  requests.cpu     0     1
+  requests.memory  0     1Gi
+
+Resource Limits
+ Type       Resource  Min    Max    Default Request  Default Limit  Max Limit/Request Ratio
+ ----       --------  ---    ---    ---------------  -------------  -----------------------
+ Container  cpu       100m   200m   200m             200m           -
+ Container  memory    100Mi  128Mi  128Mi            128Mi          -
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+kind: Pod
+metadata:
+ name: nginx1
+spec:
+ containers:
+ - name: nginx1
+   image: sreeharshav/rollingupdate:v1
+   ports:
+   - containerPort: 80" | kubectl create -f -
+pod/nginx1 created
+
+
+
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limit-mem-cpu-per-container
+spec:
+  limits:
+  - max:
+      cpu: "200m"
+      memory: "128Mi"
+    min:
+      cpu: "100m"
+      memory: "100Mi"
+    default:
+      cpu: "250m"
+    defaultRequest:
+      cpu: "150m"    
+    type: Container"
+
+
+root@ip-172-31-36-152:~# echo "apiVersion: v1
+kind: LimitRange
+metadata:
+  name: limit-mem-cpu-per-container
+spec:
+  limits:
+  - max:
+      cpu: "200m"
+      memory: "128Mi"
+    min:
+      cpu: "100m"
+      memory: "100Mi"
+    default:
+      cpu: "250m"
+    defaultRequest:
+      cpu: "150m"
+    type: Container" | kubectl create -f -
+The LimitRange "limit-mem-cpu-per-container" is invalid: spec.limits[0].default[cpu]: Invalid value: resource.Quantity{i:resource.int64Amount{value:200, scale:-3}, d:resource.infDecAmount{Dec:(*inf.Dec)(nil)}, s:"200m", Format:"DecimalSI"}: default value 250m is greater than max value 200m
+root@ip-172-31-36-152:~#
+
+No need to provide default and fefault values when min and max are given as by default the POD/Container will take max,cpu,memory as default.
+error got check vide in 1:03
+
+
+
+root@ip-172-31-36-152:~# kubectl get pods
+NAME     READY   STATUS    RESTARTS   AGE
+nginx1   1/1     Running   0          13m
+root@ip-172-31-36-152:~# kubectl delete pod nginx1
+pod "nginx1" deleted
+root@ip-172-31-36-152:~# kns
+app1
+default
+kube-node-lease
+kube-public
+kube-system
+root@ip-172-31-36-152:~# kns default
+✔ Active namespace is "default"
+root@ip-172-31-36-152:~# kns
+app1
+default
+kube-node-lease
+kube-public
+kube-system
+root@ip-172-31-36-152:~# kubectl delete ns app1
+namespace "app1" deleted
+
+vi ns.yml
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: development
+  labels:
+    name: development
+    
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+ name: object-counts
+ namespace: development
+spec:
+ hard:
+   requests.cpu: "1000m"
+   limits.cpu: "2000m"
+   requests.memory: 1Gi
+   limits.memory: 2Gi
+   pods: "10"
+   replicationcontrollers: "20"
+   resourcequotas: "10"
+   services: "5"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-memory-min-max-demo-lr
+  namespace: development
+spec:
+  limits:
+  - max:
+      cpu: "200m"
+      memory: 128Mi
+    min:
+      cpu: "100m"
+      memory: 100Mi
+    type: Container
+
+
+
+root@ip-172-31-36-152:~# vi ns.yml
+root@ip-172-31-36-152:~# vi ns.yml
+root@ip-172-31-36-152:~# kubectl create -f ns.yml
+namespace/development created
+resourcequota/object-counts created
+limitrange/cpu-memory-min-max-demo-lr created
+
+
+root@ip-172-31-36-152:~# kubectl describe ns development
+Name:         development
+Labels:       name=development
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:                   object-counts
+  Resource                Used  Hard
+  --------                ---   ---
+  limits.cpu              0     2
+  limits.memory           0     2Gi
+  pods                    0     10
+  replicationcontrollers  0     20
+  requests.cpu            0     1
+  requests.memory         0     1Gi
+  resourcequotas          1     10
+  services                0     5
+
+Resource Limits
+ Type       Resource  Min    Max    Default Request  Default Limit  Max Limit/Request Ratio
+ ----       --------  ---    ---    ---------------  -------------  -----------------------
+ Container  cpu       100m   200m   200m             200m           -
+ Container  memory    100Mi  128Mi  128Mi            128Mi          -
+root@ip-172-31-36-152:~# kubectl describe ns default
+Name:         default
+Labels:       <none>
+Annotations:  <none>
+Status:       Active
+
+No resource quota.
+
+Resource Limits
+ Type       Resource  Min  Max  Default Request  Default Limit  Max Limit/Request Ratio
+ ----       --------  ---  ---  ---------------  -------------  -----------------------
+ Container  cpu       -    -    100m             -              -
+
+
+
+this is the issue i want apply quota in developement but here apply in default
+

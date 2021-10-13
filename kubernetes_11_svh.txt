@@ -1,0 +1,310 @@
+deployment
+
+class:11
+
+Liveness Probes
+Rediness Probes
+
+
+rolling-update troubleshooting
+
+vi rc.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar
+spec:
+  replicas: 2
+  selector:
+    app: nginx
+  template:
+    metadata:
+      name: nginx
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+vi rc2.yml
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: superstar2
+spec:
+  replicas: 2
+  selector:
+    app: nginx2
+  template:
+    metadata:
+      name: nginx2
+      labels:
+        app: nginx2
+    spec:
+      containers:
+      - name: nginx
+        image: index.docker.io/sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+
+root@ip-172-31-24-186:~/testdp# kubectl create -f rc.yml
+replicationcontroller/superstar created
+
+root@ip-172-31-24-186:~/testdp#  kubectl expose rc superstar --port=8000 --target-port=80 --type=NodePort
+service/superstar exposed
+
+kubectl rolling-update still not work
+
+rollback
+
+kubectl rolling-update frontend-v1 frontend-v2 --rollback
+
+Problems
+
+1. it will be a manual update from one image to other image
+2. new rc will be created and old RC  will be deleted
+3. Roll back needs to change again to the old image
+4. Overall manual process and rc tolling-update is deprecated
+
+
+Deployment Advantages:
+1. It uses Replicasets and Replicasets automatically perform the rollingupdates
+2 RollbCK Is easy s we can record the deployements
+3. we can use liveness and readynness probes to improve application availability
+4. we can pause & resume the deployement which useful Canary Update
+
+
+vi deployemnt.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+kubectl api-resources
+
+root@ip-172-31-24-186:~/testdp# kubectl explain replicasets
+
+
+
+vi deployement.yml
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: testdeployment
+  labels:
+    name: deploy1
+    owner: shanu
+    app: prod
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        name: nginx
+        app: prod
+    spec:
+      containers:
+      - name: rollingupdate1
+        image: index.docker.io/sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+root@ip-172-31-24-186:~/testdp# kubectl create -f deployement.yml
+error: unable to recognize "deployement.yml": no matches for kind "Deployment" in version "extensions/v1beta1"
+
+
+so here extension/v1beta1 not work
+
+i change apiv1
+
+
+vi testdeploy.yml
+apiVersion: extension/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+
+
+root@ip-172-31-24-186:~/testdp# watch -n 1 kubectl get all
+
+kubectl apply -f my-deployement.yml   this is the santosh yaml file
+
+spec:
+      containers:
+      - image: sforcloud/mdevops-httpd
+        name: mdevops-httpd
+        resources: {}
+
+
+mdevops-httpd  this name
+
+
+kubectl set image deployment my-deployment mdevops-httpd=sreeharshav/testcontainer:v1
+
+
+
+Rediness Prob
+
+starting deployement appudu vastadi
+
+liveness probes
+
+mii application anta up ayyaga madyalo down ayyity appudu telliyalli ga
+
+
+root@ip-172-31-24-186:~/testdp# kubectl rollout history deployment/my-deployment                                                                             deployment.apps/my-deployment
+REVISION  CHANGE-CAUSE
+3         <none>
+4         <none>
+
+
+root@ip-172-31-24-186:~/testdp# kubectl delete  my-deployment
+error: the server doesn't have a resource type "my-deployment"
+root@ip-172-31-24-186:~/testdp# kubectl delete deployment  my-deployment
+deployment.apps "my-deployment" deleted
+
+root@ip-172-31-24-186:~/testdp# kubectl get svc
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes   ClusterIP   100.64.0.1       <none>        443/TCP        132m
+test-nip     NodePort    100.70.124.159   <none>        80:32672/TCP   14m
+root@ip-172-31-24-186:~/testdp# kubectl delete svc test-nip
+service "test-nip" deleted
+
+
+
+root@ip-172-31-24-186:~/testdp# ls
+cip.yml          lb.yml             nip.yml  rc2.yml
+deployement.yml  my-deployment.yml  rc.yml   testdeploy.yml
+root@ip-172-31-24-186:~/testdp# kubectl apply -f my-deployment.yml  --record
+Flag --record has been deprecated, --record will be removed in the future
+deployment.apps/my-deployment created
+
+
+
+if use record
+
+
+change image in yaml
+
+nennu ekkada yaml file edit chayyadam le edi chussinappudu niku gurtundalli niku
+
+again to apply thay yaml file
+
+kubectl apply -f my-deployement.ymml --record
+
+
+
+kubectl rollout history deployment/my-deployment
+
+
+it show how many time apply command we use
+
+
+kubectl rollout undo deployment/my-deployment --to-revision=1
+
+undo will apply
+
+
+kubectl get deployment/my-deployment -o yaml
+
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: my-deployment
+
+
+revison history will check here
+
+and how to setup revison limit???
+
+vi testdep.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  strategy:
+  type: RollingUpdate
+  rollingupdate:
+    maxSurge: 1
+    maxUnavailable: 0  
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+----------------------------------------------------------------------
+  strategy:
+  type: RollingUpdate
+  rollingupdate:
+    maxSurge: 1
+    maxUnavailable: 0  
+
+I add this lines what happend lets see next??
+
+
+
+ku
+
+stuck in 1:11:27
+

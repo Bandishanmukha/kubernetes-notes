@@ -1,0 +1,666 @@
+statefull sets
+
+high performance cluster we need
+
+create EFS using cluster vpc
+
+in seccurity group in node group allow nfs i do here all traffic allow
+
+In efs ntwork attached mount poit to cluster subnrts
+
+k8s is designed for ststeless Application
+
+Mysql,postgres,oracle,MSSQL are not distrubuted database
+
+differbetwwen Distruuted Database vs Centralized database
+
+
+created cluster volume
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: efs-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: run-efs-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: efs-provisioner
+     # replace with namespace where provisioner is deployed
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: efs-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-efs-provisioner
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-efs-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: efs-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: default
+roleRef:
+  kind: Role
+  name: leader-locking-efs-provisioner
+  apiGroup: rbac.authorization.k8s.io
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efs-provisioner
+  namespace: default
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: efs-provisioner
+data:
+  file.system.id: fs-082a3dd9
+  aws.region: ap-south-1
+  provisioner.name: example.com/aws-efs
+  dns.name: ""
+
+
+----
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: efs-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: efs-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: efs-provisioner
+    spec:
+      serviceAccount: efs-provisioner
+      containers:
+        - name: efs-provisioner
+          image: quay.io/external_storage/efs-provisioner:latest
+          env:
+            - name: FILE_SYSTEM_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: file.system.id
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: aws.region
+            - name: DNS_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: dns.name
+                  optional: true
+            - name: PROVISIONER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: provisioner.name
+          volumeMounts:
+            - name: pv-volume
+              mountPath: /persistentvolumes
+      volumes:
+        - name: pv-volume
+          nfs:
+            server: fs-082a3dd9.efs.ap-south-1.amazonaws.com
+            path: /
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: efs-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: efs-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: efs-provisioner
+    spec:
+      containers:
+        - name: efs-provisioner
+          image: quay.io/external_storage/efs-provisioner:latest
+          env:
+            - name: FILE_SYSTEM_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: file.system.id
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: aws.region
+            - name: PROVISIONER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: provisioner.name
+          volumeMounts:
+            - name: pv-volume
+              mountPath: /persistentvolumes
+      volumes:
+        - name: pv-volume
+          nfs:
+            server: fs-164453c7.efs.ap-south-1.amazonaws.com
+            path: /
+---
+
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: aws-efs
+provisioner: example.com/aws-efs
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: efs-1
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+kubectl get pvc
+kubectl get pv
+
+
+
+cluster doesnt cluster
+
+pending check again
+
+observation not lab
+-------------------------------------
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage:2Gi
+
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: mysql
+        env:
+          # Use secret in real usage
+        - name: MYSQL_ROOT_PASSWORD
+          value: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
+
+kubect get pods
+
+i need pressite the appplication
+
+kubectl get pods -o wide
+
+kubectl exec -it mysqljsssjssdcccf -- bash
+
+mysql -u root -p
+  enter password
+
+show databases;
+
+CREATE DATABASE books;
+USE BOOKS;
+
+WRITE SOME QARY
+
+
+SHOW DATABASES;
+
+
+DUPLICATED THE TAB
+
+
+MYSQL POD HAS DELETED
+ KUBECTL GET PODS -O WIDE
+      CHECK WHICH IP CAN RUN IN POD
+
+KUBECTl delete pod mysql
+
+again new one start
+
+kubectl get pods -o wide
+
+again login new pod
+
+kubectl exec -it mysql-huddffffc -- bash
+mysql -u root -p
+
+showdatabases;
+
+use books;
+
+show tabeles;
+
+select * author
+
+our doesnt lost
+
+
+------------------
+
+kubenetes node maintaince
+
+kubectl drain node-ip{mysql running ip address}
+
+our pod will move another node
+existing node have pod that was not change
+
+exit the mysql
+-----------
+
+42:01 stop video most imp topic
+
+sqk-write                    sql-read with 3306
+           --->----------------|
+|          _|                  | 
+          /  \
+mysql pod   mysql pod          mysql pod
+master           slave                 slave
+
+pv_1         pv_2              pv_2
+efs          efs                efs 
+
+Replicasets is not applicable
+
+kubectl delete deploy mysql
+kubect get pvc	
+
+pvc is there
+delete that one also
+
+delete pvc also
+
+---------------------------------------
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+data:
+  master.cnf: |
+    # Apply this config only on the master.
+    [mysqld]
+    log-bin
+  slave.cnf: |
+    # Apply this config only on slaves.
+    [mysqld]
+    super-read-only
+
+
+stateful set vs deploement set
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  ports:
+  - name: mysql
+    port: 3306
+  clusterIP: None
+  selector:
+    app: mysql
+---
+# Client service for connecting to any MySQL instance for reads.
+# For writes, you must instead connect to the master: mysql-0.mysql.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-read
+  labels:
+    app: mysql
+spec:
+  ports:
+  - name: mysql
+    port: 3306
+  selector:
+    app: mysql
+
+
+--------------------------------------------------
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  serviceName: mysql
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      initContainers:
+      - name: init-mysql
+        image: mysql:5.7
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          # Generate mysql server-id from pod ordinal index.
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          echo [mysqld] > /mnt/conf.d/server-id.cnf
+          # Add an offset to avoid reserved server-id=0 value.
+          echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf
+          # Copy appropriate conf.d files from config-map to emptyDir.
+          if [[ $ordinal -eq 0 ]]; then
+            cp /mnt/config-map/master.cnf /mnt/conf.d/
+          else
+            cp /mnt/config-map/slave.cnf /mnt/conf.d/
+          fi
+        volumeMounts:
+        - name: conf
+          mountPath: /mnt/conf.d
+        - name: config-map
+          mountPath: /mnt/config-map
+      - name: clone-mysql
+        image: gcr.io/google-samples/xtrabackup:1.0
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          # Skip the clone if data already exists.
+          [[ -d /var/lib/mysql/mysql ]] && exit 0
+          # Skip the clone on master (ordinal index 0).
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          [[ $ordinal -eq 0 ]] && exit 0
+          # Clone data from previous peer.
+          ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+          # Prepare the backup.
+          xtrabackup --prepare --target-dir=/var/lib/mysql
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+      containers:
+      - name: mysql
+        image: mysql:5.7
+        env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "1"
+        ports:
+        - name: mysql
+          containerPort: 3306
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            # Check we can execute queries over TCP (skip-networking is off).
+            command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+          initialDelaySeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 1
+      - name: xtrabackup
+        image: gcr.io/google-samples/xtrabackup:1.0
+        ports:
+        - name: xtrabackup
+          containerPort: 3307
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          cd /var/lib/mysql
+
+          # Determine binlog position of cloned data, if any.
+          if [[ -f xtrabackup_slave_info && "x$(<xtrabackup_slave_info)" != "x" ]]; then
+            # XtraBackup already generated a partial "CHANGE MASTER TO" query
+            # because we're cloning from an existing slave. (Need to remove the tailing semicolon!)
+            cat xtrabackup_slave_info | sed -E 's/;$//g' > change_master_to.sql.in
+            # Ignore xtrabackup_binlog_info in this case (it's useless).
+            rm -f xtrabackup_slave_info xtrabackup_binlog_info
+          elif [[ -f xtrabackup_binlog_info ]]; then
+            # We're cloning directly from master. Parse binlog position.
+            [[ `cat xtrabackup_binlog_info` =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
+            rm -f xtrabackup_binlog_info xtrabackup_slave_info
+            echo "CHANGE MASTER TO MASTER_LOG_FILE='${BASH_REMATCH[1]}',\
+                  MASTER_LOG_POS=${BASH_REMATCH[2]}" > change_master_to.sql.in
+          fi
+
+          # Check if we need to complete a clone by starting replication.
+          if [[ -f change_master_to.sql.in ]]; then
+            echo "Waiting for mysqld to be ready (accepting connections)"
+            until mysql -h 127.0.0.1 -e "SELECT 1"; do sleep 1; done
+
+            echo "Initializing replication from clone position"
+            mysql -h 127.0.0.1 \
+                  -e "$(<change_master_to.sql.in), \
+                          MASTER_HOST='mysql-0.mysql', \
+                          MASTER_USER='root', \
+                          MASTER_PASSWORD='', \
+                          MASTER_CONNECT_RETRY=10; \
+                        START SLAVE;" || exit 1
+            # In case of container restart, attempt this at-most-once.
+            mv change_master_to.sql.in change_master_to.sql.orig
+          fi
+
+          # Start a server to send backups when requested by peers.
+          exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c \
+            "xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      volumes:
+      - name: conf
+        emptyDir: {}
+      - name: config-map
+        configMap:
+          name: mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "aws-efs"
+      resources:
+        requests:
+          storage: 3Gi
+
+
+root@ip-172-31-8-33:~# kubectl get pods
+NAME                               READY   STATUS     RESTARTS   AGE
+efs-provisioner-5cc6b9c66b-zm2mz   1/1     Running    0          57m
+mysql-0                            0/2     Init:0/2   0          14s
+root@ip-172-31-8-33:~#
+
+
+root@ip-172-31-8-33:~# kubectl exec -it mysql-0 -- bash
+De
+
+
+CREATE DATABASE books;
+USE books;
+CREATE TABLE authors (id INT, name VARCHAR(20), email VARCHAR(20));
+SHOW TABLES;
+INSERT INTO authors (id,name,email) VALUES(1,"Vivek","xuz@abc.com");
+INSERT INTO authors (id,name,email) VALUES(2,"Priya","p@gmail.com");
+INSERT INTO authors (id,name,email) VALUES(3,"Tom","tom@yahoo.com");
+SHOW DATABAS;
+SELECT * FROM authors;
+
+
+mysql> SELECT * FROM authors;
++------+-------+---------------+
+| id   | name  | email         |
++------+-------+---------------+
+|    1 | Vivek | xuz@abc.com   |
+|    2 | Priya | p@gmail.com   |
+|    3 | Tom   | tom@yahoo.com |
++------+-------+---------------+
+3 rows in set (0.00 sec)
+
+
+in another pod
+
+apt install python3-pip
+pip3 install sqlalchemy
+pip3 install pymysql
+
+
+#For Reading app.py
+import sqlalchemy as sal
+import pymysql
+from sqlalchemy import create_engine
+cnx = create_engine('mysql+pymysql://root@mysql/books')
+data = cnx.execute("select * from authors").fetchall()
+#putdata = cnx.execute('INSERT INTO authors (id,name,email) VALUES(4,"Sree","sree@yahoo.com");')
+for item in data:
+    print(item)
+
+paste in utills in app.py
+
+
+
+#For Writing app-write.py
+import sqlalchemy as sal
+import pymysql
+from sqlalchemy import create_engine
+cnx = create_engine('mysql+pymysql://root@mysql-0.mysql.default.svc.cluster.local/books')
+data = cnx.execute("select * from authors").fetchall()
+putdata = cnx.execute('INSERT INTO authors (id,name,email) VALUES(7,"Munna1","Munna1@yahoo.com");')
+for item in data:
+    print(item)
+
+
+
+check again 1:17 video
+
+nslookup mysql-0.mysql
+
+mysql-0.mysql.default.svc.cluster.local

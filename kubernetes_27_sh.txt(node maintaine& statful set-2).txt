@@ -1,0 +1,101 @@
+why headless service??
+2 Daemon set when to use it
+3 node Maintainence
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+
+root@ip-172-31-8-33:~/efk# kubectl expose deployment nginx-deployment --target-port=80 --type=ClusterIP
+service/nginx-deployment exposed
+
+
+kubectl run --generator=run-pod/v1 --rm utils -it --image sreeharshav/utils -- bash
+
+nslookup nginx-deployment svc ip
+
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nginxstatefulset
+  labels:
+    app: nginxStatefulSet
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginxStatefulSet
+  serviceName: mysql 
+  template:
+    metadata:
+      labels:
+        app: nginxStatefulSet
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+
+
+
+root@ip-172-31-8-33:~# kubectl exec -it nginxstatefulset-1 -- bash
+root@nginxstatefulset-1:/#
+
+install nslookup
+root@nginxstatefulset-1:/# apt update && apt install dnsutils
+
+
+root@nginxstatefulset-1:/# nslookup nginxstatefulset-0
+Server:         100.64.0.10
+Address:        100.64.0.10#53
+
+** server can't find nginxstatefulset-0: NXDOMAIN
+
+root@nginxstatefulset-1:/#
+
+
+root@nginxstatefulset-1:/# nslookup nginxstatefulset-0.headless.default.svc.cluster.local
+Server:         100.64.0.10
+Address:        100.64.0.10#53
+
+** server can't find nginxstatefulset-0.headless.default.svc.cluster.local: NXDOMAIN
+
+root@nginxstatefulset-1:/#
+
+
+
+
+
+
+watch later
+
+
+
+------------------------------------------------------------------------
+node mainataince
+
+
+kubectl drain node ip
+
+
+kubectl uncordon node ip

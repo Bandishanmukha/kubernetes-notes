@@ -1,0 +1,664 @@
+how to save logs of k8s cluster and how Deamonset can be userful
+
+diff b/w Deployment and Deamon
+
+supose we have 3 node
+
+FluenD.sh
+
+
+
+Create Efs add mount points
+
+deploy efs-provisoner
+pv-pvstorage should up
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: efs-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: run-efs-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: efs-provisioner
+     # replace with namespace where provisioner is deployed
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: efs-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-efs-provisioner
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-efs-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: efs-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: default
+roleRef:
+  kind: Role
+  name: leader-locking-efs-provisioner
+  apiGroup: rbac.authorization.k8s.io
+
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efs-provisioner
+  namespace: default
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: efs-provisioner
+data:
+  file.system.id: fs-14e7f0c5
+  aws.region: ap-south-1
+  provisioner.name: example.com/aws-efs
+  dns.name: ""
+---
+
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: efs-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: efs-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: efs-provisioner
+    spec:
+      serviceAccount: efs-provisioner
+      containers:
+        - name: efs-provisioner
+          image: quay.io/external_storage/efs-provisioner:latest
+          env:
+            - name: FILE_SYSTEM_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: file.system.id
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: aws.region
+            - name: DNS_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: dns.name
+                  optional: true
+            - name: PROVISIONER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: provisioner.name
+          volumeMounts:
+            - name: pv-volume
+              mountPath: /persistentvolumes
+      volumes:
+        - name: pv-volume
+          nfs:
+            server: fs-14e7f0c5.efs.ap-south-1.amazonaws.com
+            path: /
+
+
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: aws-efs
+provisioner: example.com/aws-efs
+
+###########-----PVC-----################
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: efs-1
+spec:
+  storageClassName: aws-efs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+
+root@ip-172-31-8-33:~# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM           STORAGECLASS   REASON   AGE
+pvc-c5770f20-4d51-4d63-9a01-39fffc4e3f43   1Gi        RWX            Delete           Bound    default/efs-1   aws-efs                 8s
+root@ip-172-31-8-33:~#
+
+root@ip-172-31-8-33:~# kubectl delete pv pvc-c5770f20-4d51-4d63-9a01-39fffc4e3f43
+persistentvolume "pvc-c5770f20-4d51-4d63-9a01-39fffc4e3f43" deleted
+
+
+#####################DEPLOYMENT##############################
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - name: efs-pvc
+            mountPath: /tmp/efsvol
+      volumes:
+         - name: efs-pvc
+           persistentVolumeClaim:
+              claimName: efs-1
+
+root@ip-172-31-8-33:~# echo 'apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+' | kubectl create -f -
+deployment.apps/nginx-deployment created
+
+root@ip-172-31-8-33:~# kubectl expose deploy nginx-deployment --port=8000 --target-port=80 --type=NodePort
+
+root@ip-172-31-8-33:~# kubectl get svc
+NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+kubernetes         ClusterIP   100.64.0.1     <none>        443/TCP          36m
+nginx-deployment   NodePort    100.71.89.65   <none>        8000:32576/TCP   39s
+root@ip-172-31-8-33:~#
+
+
+root@ip-172-31-8-33:~# kubectl port-forward pods/nginx-deployment-555f444888-shjmw 8888:8000
+Forwarding from 127.0.0.1:8888 -> 8000
+Forwarding from [::1]:8888 -> 8000
+
+
+curl http://100.4.3.444:8000
+watch -n 1kubectl logs pod
+
+root@ip-172-31-8-33:~# kubectl logs nginx-deployment-7fd9dc44bc-xtwft
+172.20.44.140 - - [08/Oct/2021:17:23:58 +0000] "GET / HTTP/1.1" 200 696 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36" "-"
+172.20.44.140 - - [08/Oct/2021:17:23:58 +0000] "GET /style.css HTTP/1.1" 200 340 "http://3.108.228.21:32576/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36" "-"
+172.20.44.140 - - [08/Oct/2021:17:23:58 +0000] "GET /scorekeeper.js HTTP/1.1" 200 1461 "http://3.108.228.21:32576/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36" "-"
+172.20.44.140 - - [08/Oct/2021:17:23:58 +0000] "GET /favicon.ico HTTP/1.1" 404 555 "http://3.108.228.21:32576/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36" "-"
+2021/10/08 17:23:58 [error] 9#9: *2 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 172.20.44.140, server: localhost, request: "GET /favicon.ico HTTP/1.1", host: "3.108.228.21:32576", referrer: "http://3.108.228.21:32576/"
+root@ip-172-31-8-33:~#
+
+
+################################################################
+
+https://github.com/kubernetes-incubator/external-storage/tree/master/aws
+
+https://thenewstack.io/overcome-stuck-ebs-volumes-running-stateful-containers-aws/
+
+
+mkdir efk
+cd efk
+
+vi fluend.yml
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-logging
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentd
+  namespace: kube-logging
+  labels:
+    app: fluentd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluentd
+  labels:
+    app: fluentd
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: fluentd
+roleRef:
+  kind: ClusterRole
+  name: fluentd
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: fluentd
+  namespace: kube-logging
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: kube-logging
+  labels:
+    app: fluentd
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      serviceAccount: fluentd
+      serviceAccountName: fluentd
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      containers:
+      - name: fluentd
+        image: fluent/fluentd-kubernetes-daemonset:v1.4.2-debian-elasticsearch-1.1
+        env:
+          - name:  FLUENT_ELASTICSEARCH_HOST
+            value: "elasticsearch.kube-logging.svc.cluster.local"
+          - name:  FLUENT_ELASTICSEARCH_PORT
+            value: "9200"
+          - name: FLUENT_ELASTICSEARCH_SCHEME
+            value: "http"
+          - name: FLUENTD_SYSTEMD_CONF
+            value: disable
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+
+
+kubectl create -f fluend.yml
+
+
+root@ip-172-31-8-33:~/efk# kubectl create -f fluentd.yml
+namespace/kube-logging created
+serviceaccount/fluentd created
+clusterrole.rbac.authorization.k8s.io/fluentd created
+clusterrolebinding.rbac.authorization.k8s.io/fluentd created
+
+root@ip-172-31-8-33:~/efk# kubectl get ns kube-logging -o yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: "2021-10-08T18:13:22Z"
+  name: kube-logging
+  resourceVersion: "17932"
+  uid: 31eaff0f-17c8-46cc-adb1-f1ec229a2adf
+spec:
+  finalizers:
+  - kubernetes
+status:
+  phase: Active
+root@ip-172-31-8-33:~/efk#
+
+
+root@ip-172-31-8-33:~/efk# kubectl get ds -n kube-logging
+NAME      DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+fluentd   3         3         3       3            3           <none>          2m57s
+root@ip-172-31-8-33:~/efk#
+
+
+root@ip-172-31-8-33:~/efk# kubectl get pods -n kube-logging
+NAME            READY   STATUS    RESTARTS   AGE
+fluentd-55s62   1/1     Running   0          3m35s
+fluentd-7k8h7   1/1     Running   0          3m35s
+fluentd-gnxlw   1/1     Running   0          3m35s
+
+
+root@ip-172-31-8-33:~/efk# ^C
+root@ip-172-31-8-33:~/efk# kubectl get pods -n kube-logging -o wide
+NAME            READY   STATUS    RESTARTS   AGE     IP            NODE                                           NOMINATED NODE   READINESS GATES
+fluentd-55s62   1/1     Running   0          4m12s   100.96.2.10   ip-172-20-77-156.ap-south-1.compute.internal   <none>           <none>
+fluentd-7k8h7   1/1     Running   0          4m12s   100.96.0.3    ip-172-20-44-52.ap-south-1.compute.internal    <none>           <none>
+fluentd-gnxlw   1/1     Running   0          4m12s   100.96.1.9    ip-172-20-44-140.ap-south-1.compute.internal   <none>           <none>
+
+
+
+vi elasticsearch.yml
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: elasticsearch
+  namespace: kube-logging
+  labels:
+    app: elasticsearch
+spec:
+  selector:
+    app: elasticsearch
+  clusterIP: None
+  ports:
+    - port: 9200
+      name: rest
+    - port: 9300
+      name: inter-node
+---      
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: es-cluster
+  namespace: kube-logging
+spec:
+  serviceName: elasticsearch
+  replicas: 3
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.2.0
+        resources:
+            limits:
+              cpu: 1000m
+            requests:
+              cpu: 100m
+        ports:
+        - containerPort: 9200
+          name: rest
+          protocol: TCP
+        - containerPort: 9300
+          name: inter-node
+          protocol: TCP
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+        env:
+          - name: cluster.name
+            value: k8s-logs
+          - name: node.name
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: discovery.seed_hosts
+            value: "es-cluster-0.elasticsearch,es-cluster-1.elasticsearch,es-cluster-2.elasticsearch"
+          - name: cluster.initial_master_nodes
+            value: "es-cluster-0,es-cluster-1,es-cluster-2"
+          - name: ES_JAVA_OPTS
+            value: "-Xms512m -Xmx512m"
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+      - name: increase-vm-max-map
+        image: busybox
+        command: ["sysctl", "-w", "vm.max_map_count=262144"]
+        securityContext:
+          privileged: true
+      - name: increase-fd-ulimit
+        image: busybox
+        command: ["sh", "-c", "ulimit -n 65536"]
+        securityContext:
+          privileged: true
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        app: elasticsearch
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: aws-efs
+      resources:
+        requests:
+          storage: 3Gi
+
+
+root@ip-172-31-8-33:~/efk# kubectl create -f elaticsearch.yml
+service/elasticsearch created
+statefulset.apps/es-cluster created
+
+
+
+root@ip-172-31-8-33:~/efk# kubectl get pods -n kube-logging -o wide
+NAME            READY   STATUS    RESTARTS   AGE    IP            NODE                                           NOMINATED NODE   READINESS GATES
+es-cluster-0    1/1     Running   0          2m8s   100.96.1.10   ip-172-20-44-140.ap-south-1.compute.internal   <none>           <none>
+es-cluster-1    1/1     Running   0          67s    100.96.2.11   ip-172-20-77-156.ap-south-1.compute.internal   <none>           <none>
+es-cluster-2    1/1     Running   0          19s    100.96.1.11   ip-172-20-44-140.ap-south-1.compute.internal   <none>           <none>
+fluentd-55s62   1/1     Running   0          10m    100.96.2.10   ip-172-20-77-156.ap-south-1.compute.internal   <none>           <none>
+fluentd-7k8h7   1/1     Running   0          10m    100.96.0.3    ip-172-20-44-52.ap-south-1.compute.internal    <none>           <none>
+fluentd-gnxlw   1/1     Running   0          10m    100.96.1.9    ip-172-20-44-140.ap-south-1.compute.internal   <none>           <none>
+
+
+
+root@ip-172-31-8-33:~/efk# vi elaticsearch.yml
+root@ip-172-31-8-33:~/efk# kubectl get all -n kube-logging -o wide
+NAME                READY   STATUS    RESTARTS   AGE   IP            NODE                                           NOMINATED NODE   READINESS GATES
+pod/es-cluster-0    1/1     Running   0          12m   100.96.1.10   ip-172-20-44-140.ap-south-1.compute.internal   <none>           <none>
+pod/es-cluster-1    1/1     Running   0          11m   100.96.2.11   ip-172-20-77-156.ap-south-1.compute.internal   <none>           <none>
+pod/es-cluster-2    1/1     Running   0          10m   100.96.1.11   ip-172-20-44-140.ap-south-1.compute.internal   <none>           <none>
+pod/fluentd-55s62   1/1     Running   0          20m   100.96.2.10   ip-172-20-77-156.ap-south-1.compute.internal   <none>           <none>
+pod/fluentd-7k8h7   1/1     Running   0          20m   100.96.0.3    ip-172-20-44-52.ap-south-1.compute.internal    <none>           <none>
+pod/fluentd-gnxlw   1/1     Running   0          20m   100.96.1.9    ip-172-20-44-140.ap-south-1.compute.internal   <none>           <none>
+
+NAME                    TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)             AGE   SELECTOR
+service/elasticsearch   ClusterIP   None         <none>        9200/TCP,9300/TCP   12m   app=elasticsearch
+
+NAME                     DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE   CONTAINERS   IMAGES                                                                SELECTOR
+daemonset.apps/fluentd   3         3         3       3            3           <none>          20m   fluentd      fluent/fluentd-kubernetes-daemonset:v1.4.2-debian-elasticsearch-1.1   app=fluentd
+
+NAME                          READY   AGE   CONTAINERS      IMAGES
+statefulset.apps/es-cluster   3/3     12m   elasticsearch   docker.elastic.co/elasticsearch/elasticsearch:7.2.0
+
+root@ip-172-31-8-33:~/efk# kubectl delete statefulset.apps es-cluster -n kube-logging
+statefulset.apps "es-cluster" deleted
+
+not need delete
+
+root@ip-172-31-8-33:~/efk# kubectl get pods -n kube-logging
+NAME            READY   STATUS     RESTARTS   AGE
+es-cluster-0    1/1     Running    0          26s
+es-cluster-1    0/1     Init:2/3   0          15s
+fluentd-55s62   1/1     Running    0          28m
+fluentd-7k8h7   1/1     Running    0          28m
+fluentd-gnxlw   1/1     Running    0          28m
+
+
+
+
+
+vi kibana.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: kube-logging
+  labels:
+    app: kibana
+spec:
+  ports:
+  - port: 5601
+  selector:
+    app: kibana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: kube-logging
+  labels:
+    app: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:7.2.0
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        env:
+          - name: ELASTICSEARCH_URL
+            value: http://elasticsearch:9200
+        ports:
+        - containerPort: 5601
+root@ip-172-31-8-33:~/efk# kubectl create -f kiban.yml
+service/kibana created
+deployment.apps/kibana created
+ 
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/rollingupdate:v3
+        ports:
+        - containerPort: 80
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: counter
+spec:
+  containers:
+  - name: count
+    image: busybox
+    args: [/bin/sh, -c,
+            'i=0; while true; do echo "$i: $(date)"; i=$((i+1)); sleep 1; done']
+
+
+root@ip-172-31-8-33:~/efk# kubectl get svc
+NAME            TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
+elasticsearch   ClusterIP   None            <none>        9200/TCP,9300/TCP   28m
+kibana          ClusterIP   100.65.28.183   <none>        5601/TCP            18m
+root@ip-172-31-8-33:~/efk# kubectl get svc
+
+
+root@ip-172-31-8-33:~/efk# kubectl expose deploy kibana --port=8500 --target-port=5601 --type=NodePort --name=kibana2
+service/kibana2 exposed
+
+
+
+video stop in 1:17 mins

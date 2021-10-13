@@ -1,0 +1,662 @@
+USERACCES
+
+Roles & Cluster
+      |
+Rolebinding & Cluster Role Binding
+      |
+serviceAccounts(application simply pods) & Users (team mngment)
+
+k8s Dont have any user Management System 
+we integrated 3rd party tool
+
+
+certificates & kubeconfig files.
+
+cat .kube/config
+
+root@ip-172-31-36-152:~# kubectl config view
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: DATA+OMITTED
+    server: https://api.kiwidev.xyz
+  name: kiwidev.xyz
+contexts:
+- context:
+    cluster: kiwidev.xyz
+    user: kiwidev.xyz
+  name: kiwidev.xyz
+current-context: kiwidev.xyz
+kind: Config
+preferences: {}
+users:
+- name: kiwidev.xyz
+  user:
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+
+
+
+User_creation_steps:
+
+1. shanu.key and shanu.csr and sign the cert with k8s cluster CA Authority.
+2. Once Signed we will get a shanu.crt
+
+Amazon S3
+kiwidev4.xyz
+kiwidev.xyz/
+pki/
+private/
+ca/    for key
+
+
+Amazon S3
+kiwidev4.xyz
+kiwidev.xyz/
+pki/
+issued/
+ca/   for cret
+
+
+root@ip-172-31-36-152:~# mkdir shanu
+root@ip-172-31-36-152:~# cd shanu/
+root@ip-172-31-36-152:~/shanu# vi CA.key
+
+root@ip-172-31-36-152:~/shanu# vi CA.crt
+
+
+openssl genrsa -out shanu.key 2048
+
+
+root@ip-172-31-36-152:~/shanu# openssl genrsa -out shanu.key 2048
+Generating RSA private key, 2048 bit long modulus (2 primes)
+..................................................+++++
+................................+++++
+e is 65537 (0x010001)
+root@ip-172-31-36-152:~/shanu# ls
+CA.crt  CA.key  shanu.key
+
+
+openssl req -new -key shanu.key -out shanu.csr -subj "/CN=shanu/O=development"
+
+
+root@ip-172-31-36-152:~/shanu# openssl req -new -key shanu.key -out shanu.csr -subj "/CN=shanu/O=development"
+root@ip-172-31-36-152:~/shanu# ll
+total 24
+drwxr-xr-x 2 root root 4096 Sep 21 15:38 ./
+drwx------ 9 root root 4096 Sep 21 15:16 ../
+-rw-r--r-- 1 root root 1083 Sep 21 15:14 CA.crt
+-rw-r--r-- 1 root root 1680 Sep 21 15:12 CA.key
+-rw-r--r-- 1 root root  915 Sep 21 15:38 shanu.csr
+-rw------- 1 root root 1679 Sep 21 15:37 shanu.key
+
+
+openssl x509 -req -in shanu.csr -CA ${HOME}/.minikube/ca.crt -CAkey ${HOME}/.minikube/ca.key  -CAcreateserial -out anand.crt -days 45
+
+openssl x509 -req -in shanu.csr -CA CA.crt -CAkey CA.key -CAcreateserial -out shanu.crt -days 2
+
+root@ip-172-31-36-152:~/shanu# openssl x509 -req -in shanu.csr -CA CA.crt -CAkey -CAcreateserial -out shanu.crt -days 2
+Signature ok
+subject=CN = shanu, O = development
+Getting CA Private Key
+Can't open -CAcreateserial for reading, No such file or directory
+140307711673664:error:02001002:system library:fopen:No such file or directory:../crypto/bio/bss_file.c:69:fopen('-CAcreateserial','r')
+140307711673664:error:2006D080:BIO routines:BIO_new_file:no such file:../crypto/bio/bss_file.c:76:
+unable to load CA Private Key
+
+(trouble shoot)
+root@ip-172-31-36-152:~/shanu# openssl x509 -req -in shanu.csr -CA CA.crt -CAkey CA.key -CAcreateserial -out shanu.crt -days 45
+Signature ok
+subject=CN = nag, O = development
+Getting CA Private Key
+
+root@ip-172-31-36-152:~/shanu# ll
+total 24
+drwxr-xr-x 2 root root 4096 Sep 21 15:44 ./
+drwx------ 9 root root 4096 Sep 21 15:16 ../
+-rw-r--r-- 1 root root 1083 Sep 21 15:14 CA.crt
+-rw-r--r-- 1 root root 1680 Sep 21 15:12 CA.key
+-rw-r--r-- 1 root root    0 Sep 21 15:44 shanu.crt
+-rw-r--r-- 1 root root  915 Sep 21 15:38 shanu.csr
+-rw------- 1 root root 1679 Sep 21 15:37 shanu.key
+
+
+
+
+kubectl config set-credentials anand --client-certificate ${HOME}/.kube/anand.crt --client-key ${HOME}/.kube/anand.key
+
+
+
+
+
+
+kubectl config set-credentials shanu --client-certificate shanu.crt --client-key shanu.key
+
+
+root@ip-172-31-36-152:~/shanu# kubectl config set-credentials shanu --client-certificate shanu.crt --client-key shanu.key
+User "shanu" set.
+root@ip-172-31-36-152:~/shanu#
+
+
+root@ip-172-31-36-152:~/shanu# kubectl config view
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: DATA+OMITTED
+    server: https://api.kiwidev.xyz
+  name: kiwidev.xyz
+contexts:
+- context:
+    cluster: kiwidev.xyz
+    user: kiwidev.xyz
+  name: kiwidev.xyz
+current-context: kiwidev.xyz
+kind: Config
+preferences: {}
+users:
+- name: kiwidev.xyz
+  user:
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+- name: shanu
+  user:
+    client-certificate: /root/shanu/shanu.crt
+    client-key: /root/shanu/shanu.key
+root@ip-172-31-36-152:~/shanu#
+
+
+here we set user now we set context
+
+kubectl config set-context shanu-context --cluster=kiwidev.xyz
+
+root@ip-172-31-36-152:~/shanu# kubectl create ns payroll
+namespace/payroll created
+
+
+root@ip-172-31-36-152:~/shanu# ^C
+root@ip-172-31-36-152:~/shanu# kubectl config set-context shanu-context --cluster=kiwidev.xyz --namespace=payroll --user=shanu
+Context "shanu-context" created.
+
+
+root@ip-172-31-36-152:~/shanu# kubectl config view
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: DATA+OMITTED
+    server: https://api.kiwidev.xyz
+  name: kiwidev.xyz
+contexts:
+- context:
+    cluster: kiwidev.xyz
+    user: kiwidev.xyz
+  name: kiwidev.xyz
+- context:
+    cluster: kiwidev.xyz
+    namespace: payroll
+    user: shanu
+  name: shanu-context
+current-context: kiwidev.xyz
+kind: Config
+preferences: {}
+users:
+- name: kiwidev.xyz
+  user:
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+- name: shanu
+  user:
+    client-certificate: /root/shanu/shanu.crt
+    client-key: /root/shanu/shanu.key
+
+
+root@ip-172-31-36-152:~/shanu# kubectl get pods --context=shanu-context
+E0921 16:00:35.736926    1879 cert_rotation.go:168] key failed with : tls: failed to find any PEM data in certificate input
+E0921 16:00:35.743001    1879 cert_rotation.go:168] key failed with : tls: failed to find any PEM data in certificate input
+E0921 16:00:35.753422    1879 cert_rotation.go:168] key failed with : tls: failed to find any PEM data in certificate input
+Unable to connect to the server: tls: failed to find any PEM data in certificate input
+root@ip-172-31-36-152:~/shanu#
+
+
+
+
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: test-role
+  namespace: test
+rules:
+- apiGroups: [\"\", "extensions", "apps"] # "" indicates the core API group
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "update", "list", "create", "delete"]
+
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: shanu-RoleBinding
+  namespace: test
+subjects:
+- kind: User
+  name: shanu
+  apiGroup: \"\"
+roleRef:
+  kind: Role
+  name: test-role
+  apiGroup: \"\" 
+
+
+
+root@ip-172-31-36-152:~/shanu# echo "kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: payroll-role
+  namespace: payroll
+rules:
+- apiGroups: [\"\", "extensions", "apps"] # "" indicates the core API group
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "update", "list", "create", "delete"]" | kubectl create -f -
+role.rbac.authorization.k8s.io/payroll-role created
+
+
+root@ip-172-31-36-152:~/shanu# kubectl get role -n payroll
+NAME           CREATED AT
+payroll-role   2021-09-21T16:15:56Z
+
+
+
+root@ip-172-31-36-152:~/shanu# echo "kind: RoleBinding
+> apiVersion: rbac.authorization.k8s.io/v1beta1
+> metadata:
+>   name: shanu-RoleBinding
+>   namespace: payroll
+> subjects:
+> - kind: User
+>   name: shanu
+>   apiGroup: \"\"
+> roleRef:
+>   kind: Role
+>   name: payroll-role
+>   apiGroup: \"\"" | kubectl create -f -
+Warning: rbac.authorization.k8s.io/v1beta1 RoleBinding is deprecated in v1.17+, unavailable in v1.22+; use rbac.authorization.k8s.io/v1 RoleBinding
+rolebinding.rbac.authorization.k8s.io/shanu-RoleBinding created
+
+
+root@ip-172-31-36-152:~/shanu# kubectl get rolebinding.rbac.authorization.k8s.io  -n payroll
+NAME                ROLE                AGE
+shanu-RoleBinding   Role/payroll-role   47s
+
+
+root@ip-172-31-36-152:~/shanu# kubectl get pods --context=shanu-context
+E0921 16:21:14.724071    1982 cert_rotation.go:168] key failed with : tls: failed to find any PEM data in certificate input
+E0921 16:21:14.730851    1982 cert_rotation.go:168] key failed with : tls: failed to find any PEM data in certificate input
+Unable to connect to the server: tls: failed to find any PEM data in certificate input
+
+
+
+root@ip-172-31-36-152:~/shanu# kubectl run hello1 --image=sreeharshav/rollingupdate:v1 -n payroll --context=shanu-context
+E0921 16:23:19.415078    2002 cert_rotation.go:168] key failed with : tls: failed to find any PEM data in certificate input
+E0921 16:23:19.420481    2002 cert_rotation.go:168] key failed with : tls: failed to find any PEM data in certificate input
+Unable to connect to the server: tls: failed to find any PEM data in certificate input
+
+
+
+stop video in 39:22
+
+
+root@ip-172-31-36-152:~/shanu# kubectl delete pod hello1 --context=shanu-context
+pod "hello1" deleted
+
+
+
+root@ip-172-31-36-152:~/shanu# cat ~/.kube/config > shanu_config
+root@ip-172-31-36-152:~/shanu# ls
+CA.crt  CA.key  CA.srl  shanu.crt  shanu.csr  shanu.key  shanu_config
+
+
+
+root@ip-172-31-36-152:~/shanu# vi shanu_config
+contexts:
+- context:
+    cluster: kiwidev.xyz
+    namespace: test
+    user: shanu
+  name: shanu-context
+current-context: shanu-context
+kind: Config
+preferences: {}
+users:
+- name: shanu
+  user:
+    client-certificate: /root/shanu/shanu.crt
+    client-key: /root/shanu/shanu.key
+- name: shanu
+  user:
+    client-certificate: shanu.crt
+    client-key: shanu.key
+
+
+apt install zip
+
+
+root@ip-172-31-36-152:~/shanu# ls
+CA.crt  CA.key  CA.srl  shanu.crt  shanu.csr  shanu.key  shanu_config
+root@ip-172-31-36-152:~/shanu# zip shanu.zip shanu_config shanu.key shanu.csr shanu.crt
+  adding: shanu_config (deflated 32%)
+  adding: shanu.key (deflated 23%)
+  adding: shanu.csr (deflated 22%)
+  adding: shanu.crt (deflated 23%)
+root@ip-172-31-36-152:~/shanu#
+
+
+root@ip-172-31-36-152:~/shanu# cp shanu.zip /tmp/
+root@ip-172-31-36-152:~/shanu# cd /tmp/
+root@ip-172-31-36-152:/tmp# ls
+shanu.zip
+snap.lxd
+systemd-private-fff8b482094c4f3d9d5363052253d37d-systemd-logind.service-sl0RFf
+systemd-private-fff8b482094c4f3d9d5363052253d37d-systemd-resolved.service-kjnDki
+systemd-private-fff8b482094c4f3d9d5363052253d37d-systemd-timesyncd.service-EvcL0e
+root@ip-172-31-36-152:/tmp#
+
+
+root@ip-172-31-36-152:/tmp# unzip shanu.zip
+Archive:  shanu.zip
+  inflating: shanu_config
+  inflating: shanu.key
+  inflating: shanu.csr
+  inflating: shanu.crt
+root@ip-172-31-36-152:/tmp# ls
+shanu.crt  shanu.zip     systemd-private-fff8b482094c4f3d9d5363052253d37d-systemd-logind.service-sl0RFf
+shanu.csr  shanu_config  systemd-private-fff8b482094c4f3d9d5363052253d37d-systemd-resolved.service-kjnDki
+shanu.key  snap.lxd      systemd-private-fff8b482094c4f3d9d5363052253d37d-systemd-timesyncd.service-EvcL0e
+root@ip-172-31-36-152:/tmp#
+
+
+root@ip-172-31-36-152:/tmp# rm -f shanu*
+
+
+
+this zip file downoad local 
+use cmd promt use below cmd
+
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config get pods
+
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config run testdeploy --image=sreeharshav/rollingupdate:v3
+pod/testdeploy created
+
+C:\Users\NageswaraRao\Desktop\shanu>
+
+
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config get pods
+NAME         READY   STATUS    RESTARTS   AGE
+testdeploy   1/1     Running   0          51s
+
+
+
+root@ip-172-31-36-152:~/shanu# kubectl create ns test2
+namespace/test2 created
+root@ip-172-31-36-152:~/shanu# kubectl create ns test1
+namespace/test1 created
+
+
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: test1-role
+  namespace: test1
+rules:
+- apiGroups: [\"\", "extensions", "apps"] # "" indicates the core API group
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "update", "list", "create", "delete"]
+
+
+---------------------------------------------------
+2 role
+---------------------------------------------------
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: test2-role
+  namespace: test2
+rules:
+- apiGroups: [\"\", "extensions", "apps"] # "" indicates the core API group
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "update", "list", "create", "delete"]
+----------------------------------------------------------------------------------
+
+multiple namespace wth single role
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: test-role
+  namespace: test1
+  namespace: test2
+rules:
+- apiGroups: [\"\", "extensions", "apps"] # "" indicates the core API group
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "update", "list", "create", "delete"]
+
+----------------------------------------------------------------------------------
+
+root@ip-172-31-36-152:~/shanu# echo "kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: test-role
+  namespace: test1
+  namespace: test2
+rules:
+- apiGroups: [\"\", "extensions", "apps"] # "" indicates the core API group
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "update", "list", "create", "delete"]" | kubectl create -f -
+role.rbac.authorization.k8s.io/test-role created
+
+root@ip-172-31-36-152:~/shanu# kubectl get role -A
+NAMESPACE     NAME                                             CREATED AT
+kube-public   system:controller:bootstrap-signer               2021-09-22T13:31:49Z
+kube-system   extension-apiserver-authentication-reader        2021-09-22T13:31:49Z
+kube-system   kops-controller                                  2021-09-22T13:31:53Z
+kube-system   system::leader-locking-kube-controller-manager   2021-09-22T13:31:49Z
+kube-system   system::leader-locking-kube-scheduler            2021-09-22T13:31:49Z
+kube-system   system:controller:bootstrap-signer               2021-09-22T13:31:49Z
+kube-system   system:controller:cloud-provider                 2021-09-22T13:31:49Z
+kube-system   system:controller:token-cleaner                  2021-09-22T13:31:49Z
+test          test-role                                        2021-09-22T14:03:31Z
+test2         test-role                                        2021-09-22T15:43:11Z
+
+
+In this scennrio is not applicable
+-----------------------------------------------------
+root@ip-172-31-36-152:~/shanu# kubectl get roles -A
+NAMESPACE     NAME                                             CREATED AT
+kube-public   system:controller:bootstrap-signer               2021-09-22T13:31:49Z
+kube-system   extension-apiserver-authentication-reader        2021-09-22T13:31:49Z
+kube-system   kops-controller                                  2021-09-22T13:31:53Z
+kube-system   system::leader-locking-kube-controller-manager   2021-09-22T13:31:49Z
+kube-system   system::leader-locking-kube-scheduler            2021-09-22T13:31:49Z
+kube-system   system:controller:bootstrap-signer               2021-09-22T13:31:49Z
+kube-system   system:controller:cloud-provider                 2021-09-22T13:31:49Z
+kube-system   system:controller:token-cleaner                  2021-09-22T13:31:49Z
+test          test-role                                        2021-09-22T14:03:31Z
+test1         test1-role                                       2021-09-22T15:59:11Z
+test2         test2-role                                       2021-09-22T15:59:52Z
+
+------------------------------------
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: shanu-RoleBinding
+  namespace: test1
+subjects:
+- kind: User
+  name: shanu
+  apiGroup: \"\"
+roleRef:
+  kind: Role
+  name: test1-role
+  apiGroup: \"\" 
+
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: shanu-RoleBinding
+  namespace: test2
+subjects:
+- kind: User
+  name: shanu
+  apiGroup: \"\"
+roleRef:
+  kind: Role
+  name: test2-role
+  apiGroup: \"\" 
+
+
+
+root@ip-172-31-36-152:~/shanu# kubectl get rolebinding.rbac.authorization.k8s.io -A
+NAMESPACE     NAME                                                ROLE                                                  AGE
+kube-public   system:controller:bootstrap-signer                  Role/system:controller:bootstrap-signer               157m
+kube-system   kops-controller                                     Role/kops-controller                                  157m
+kube-system   system::extension-apiserver-authentication-reader   Role/extension-apiserver-authentication-reader        157m
+kube-system   system::leader-locking-kube-controller-manager      Role/system::leader-locking-kube-controller-manager   157m
+kube-system   system::leader-locking-kube-scheduler               Role/system::leader-locking-kube-scheduler            157m
+kube-system   system:controller:bootstrap-signer                  Role/system:controller:bootstrap-signer               157m
+kube-system   system:controller:cloud-provider                    Role/system:controller:cloud-provider                 157m
+kube-system   system:controller:token-cleaner                     Role/system:controller:token-cleaner                  157m
+test          shanu-RoleBinding                                   Role/test-role                                        125m
+test1         shanu-RoleBinding                                   Role/test1-role                                       2m8s
+test2         shanu-RoleBinding                                   Role/test2-role                                       56s
+
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config config view
+
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config config
+
+
+get all details
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config config get-contexts
+CURRENT   NAME            CLUSTER       AUTHINFO   NAMESPACE
+*         shanu-context   kiwidev.xyz   shanu      test
+          shanu-test1     kiwidev.xyz   shanu      test1
+          shanu-test2     kiwidev.xyz   shanu      test2
+
+
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config config use-context shanu-test1
+Switched to context "shanu-test1".
+
+C:\Users\NageswaraRao\Desktop\shanu>kubectl --kubeconfig=shanu_config config get-contexts
+CURRENT   NAME            CLUSTER       AUTHINFO   NAMESPACE
+          shanu-context   kiwidev.xyz   shanu      test
+*         shanu-test1     kiwidev.xyz   shanu      test1
+          shanu-test2     kiwidev.xyz   shanu      test2
+
+C:\Users\NageswaraRao\Desktop\shanu>
+
+
+https://github.com/ahmetb/kubectx/releases/download/v0.9.4/kubectx_v0.9.4_windows_x86_64.zip
+
+
+https://github.com/ahmetb/kubectx/releases/download/v0.9.4/kubens_v0.9.4_windows_x86_64.zip
+
+
+before 1:22 check video
+===============================================================================
+root@ip-172-31-36-152:~/shanu# kubectl get roles -A
+NAMESPACE     NAME                                             CREATED AT
+kube-public   system:controller:bootstrap-signer               2021-09-22T13:31:49Z
+kube-system   extension-apiserver-authentication-reader        2021-09-22T13:31:49Z
+kube-system   kops-controller                                  2021-09-22T13:31:53Z
+kube-system   system::leader-locking-kube-controller-manager   2021-09-22T13:31:49Z
+kube-system   system::leader-locking-kube-scheduler            2021-09-22T13:31:49Z
+kube-system   system:controller:bootstrap-signer               2021-09-22T13:31:49Z
+kube-system   system:controller:cloud-provider                 2021-09-22T13:31:49Z
+kube-system   system:controller:token-cleaner                  2021-09-22T13:31:49Z
+test          test-role                                        2021-09-22T14:03:31Z
+test1         test1-role                                       2021-09-22T15:59:11Z
+test2         test2-role                                       2021-09-22T15:59:52Z
+root@ip-172-31-36-152:~/shanu# kubectl delete role test2-role -n test2
+role.rbac.authorization.k8s.io "test2-role" deleted
+root@ip-172-31-36-152:~/shanu# kubectl delete role test1-role -n test1
+role.rbac.authorization.k8s.io "test1-role" deleted
+root@ip-172-31-36-152:~/shanu# kubectl delete role test-role -n test
+role.rbac.authorization.k8s.io "test-role" deleted
+
+
+cluster role binding
+
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: test-role
+rules:
+- apiGroups: [\"\", "extensions", "apps"] # "" indicates the core API group
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "update", "list", "create", "delete"]
+
+root@ip-172-31-36-152:~/shanu# kubectl get clusterrole | grep -i test
+test-role                                                              2021-09-22T16:53:47Z
+
+
+----------------------------------------------------------------------------------------
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: shanu-Cluster-Role-Binding
+  namespace: test
+subjects:
+- kind: User
+  name: shanu
+  apiGroup: \"\"
+roleRef:
+  kind: ClusterRole
+  name: test-role
+  apiGroup: \"\" 
+
+
+root@ip-172-31-36-152:~/shanu# echo "
+> kind: ClusterRoleBinding
+> apiVersion: rbac.authorization.k8s.io/v1beta1
+> metadata:
+>   name: shanu-Cluster-Role-Binding
+>   namespace: test
+> subjects:
+> - kind: User
+>   name: shanu
+>   apiGroup: \"\"
+> roleRef:
+>   kind: ClusterRole
+>   name: test-role
+>   apiGroup: \"\"" | kubectl create -f -
+Warning: rbac.authorization.k8s.io/v1beta1 ClusterRoleBinding is deprecated in v1.17+, unavailable in v1.22+; use rbac.authorization.k8s.io/v1 ClusterRoleBinding
+clusterrolebinding.rbac.authorization.k8s.io/shanu-Cluster-Role-Binding created
+root@ip-172-31-36-152:~/shanu#
+
+
+
+According to rolebinging to all namespaces
+
+
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: shanu-RoleBinding
+subjects:
+- kind: User
+  name: shanu
+  apiGroup: \"\"
+roleRef:
+  kind: ClusterRole
+  name: test-role
+  apiGroup: \"\" 
