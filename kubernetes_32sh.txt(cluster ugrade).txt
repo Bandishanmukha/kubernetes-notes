@@ -1,0 +1,76 @@
+Cluster Upgarade
+
+
+kops create cluster --name=kiwidev.xyz --state=s3://kiwidev4.xyz --zones=ap-south-1a,ap-south-1b --node-count=3 --node-size=t2.medium --master-size=t2.medium --master-count=3 --master-zones=ap-south-1a,ap-south-1b --master-volume-size 10 --node-volume-size 10 --dns-zone=kiwidev.xyz --kubernetes-version=1.19.0 --yes
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: sreeharshav/testcontainer:v1
+        ports:
+        - containerPort: 80
+        readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            httpGet:
+                path: /
+                port: 80
+
+        livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            httpGet:
+                path: /
+                port: 80
+
+
+root@ip-172-31-8-33:~# kubectl get nodes
+NAME                                           STATUS   ROLES                  AGE   VERSION
+ip-172-20-37-180.ap-south-1.compute.internal   Ready    control-plane,master   99m   v1.19.0
+ip-172-20-37-84.ap-south-1.compute.internal    Ready    control-plane,master   99m   v1.19.0
+ip-172-20-47-38.ap-south-1.compute.internal    Ready    node                   97m   v1.19.0
+ip-172-20-62-85.ap-south-1.compute.internal    Ready    node                   97m   v1.19.0
+ip-172-20-64-192.ap-south-1.compute.internal   Ready    control-plane,master   99m   v1.19.0
+ip-172-20-68-20.ap-south-1.compute.internal    Ready    node                   97m   v1.19.0
+root@ip-172-31-8-33:~#
+
+
+kops edit cluster
+
+kops update cluster kiwidev.xyz --yes
+
+kops rolling-update cluster --yes
+
+
+root@ip-172-31-8-33:~# kubectl get nodes
+NAME                                           STATUS   ROLES                  AGE     VERSION
+ip-172-20-47-38.ap-south-1.compute.internal    Ready    node                   119m    v1.19.0
+ip-172-20-54-1.ap-south-1.compute.internal     Ready    control-plane,master   81s     v1.21.0
+ip-172-20-62-85.ap-south-1.compute.internal    Ready    node                   119m    v1.19.0
+ip-172-20-63-194.ap-south-1.compute.internal   Ready    control-plane,master   8m12s   v1.21.0
+ip-172-20-64-192.ap-south-1.compute.internal   Ready    control-plane,master   120m    v1.19.0
+ip-172-20-68-20.ap-south-1.compute.internal    Ready    node                   119m    v1.19.0
+root@ip-172-31-8-33:~#
+

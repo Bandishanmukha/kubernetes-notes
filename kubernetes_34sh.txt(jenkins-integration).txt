@@ -1,0 +1,120 @@
+jenkins integration
+
+
+install docker
+
+
+root@ip-172-31-6-152:~# usermod -aG docker jenkins
+root@ip-172-31-6-152:~# usermod -aG root jenkins
+root@ip-172-31-6-152:~# systemctl reload docker.service
+root@ip-172-31-6-152:~# service docker restart
+root@ip-172-31-6-152:~# service jenkins restart
+root@ip-172-31-6-152:~#
+
+
+root@ip-172-31-6-152:~# su - jenkins
+jenkins@ip-172-31-6-152:~$ pwd
+/var/lib/jenkins
+
+
+
+Docker
+Cloud Providers Cluster Management and Distributed Build docker
+This plugin integrates Jenkins with Docker
+
+
+Kubernetes CLI
+kubernetes
+Configure kubectl for Kubernetes
+
+Kubernetes :: Pipeline :: DevOps Steps
+kubernetes pipeline
+
+
+root@ip-172-31-6-152:/usr/local/bin# curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+
+
+
+su - jenkins
+vi .kube/config
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM4akNDQWRxZ0F3SUJBZ0lNRnE5a05wS0xQSjVkUzAvNE1BMEdDU3FHU0liM0RRRUJDd1VBTUJVeEV6QVIKQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13SGhjTk1qRXhNREUzTURreU1qVTFXaGNOTXpFeE1ERTNNRGt5TWpVMQpXakFWTVJNd0VRWURWUVFERXdwcmRXSmxjbTVsZEdWek1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBCk1JSUJDZ0tDQVFFQXZQMTBFd3pXa2tqSHdkQWk3enM5Sk1VaXUycDNaRkdMQXRwalk0bTRBV3FjRmRhSVVMdW8KZmNZclNaRnhJSkVma3grNjlyayt6Ujl5YVZncnJvVi9CNUp4dWNnajQ4UjEzZzJvang0eUxKd0lPWHhtU0F4QgpETHpKOXF0UXgwa3hyUE5HaWdiVWVrNlFwb0tSckhIbXVOSFZSaVhKZ1NLTXgrM2c4WGZ0ajBqNU5GdEdmWWpMCmlJUzJTY092TS92WVJDdjNpTEdQVFRkVUFTd2F4UEZ4U1NZN2RZREUvRzBwZSs0R0hqcnNLREFmSzY0WWZ3NVQKQnJmM2RNdEtXL3ovRFg1TnVMc0JDN2FLalpKV3lreDJINDJXYUpFbm9DNHBVb20wbUh3elh5VXNtUXhZSnkzagpKK3J1YTFLOEVaajFoQ3YzaWFSTkcwalExWE4rUFRGU3VRSURBUUFCbzBJd1FEQU9CZ05WSFE4QkFmOEVCQU1DCkFRWXdEd1lEVlIwVEFRSC9CQVV3QXdFQi96QWRCZ05WSFE0RUZnUVVEazF6MUxxRkp4NllwZEJ2dG9UM2puOXUKSjFFd0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFEUW1NRU5CRWRJbWpZLzhNeXBabFRCU0hqd1JnY29JaVpTRQo0azEwd0dScmx1NDRxaWFNbkF3aWFvN0tMcitrcjBUK3lKdjlNUitMT1dlWWt6eUxVMjN2R1NGMHlLckhmVTkzCndjc2lBTkNaSUhOei9LRlVrZm5HVXpMbCt4T0tYV2hDQnBBUVNhNEJsWlNJM0ltUEE5YlZRdnZwSWI4TTJJOGwKdUNKTUFjcjJEM1YwSG4vYk50bzNDTkxWc1BidnM1NlR3UFBLMzZlbDNqSTQyWUxZSExJc05qK1huM0Nzd1VWNgp6RVZxV0FoYU9DeWRhVXNDOG5GeTk0VEN6cVVIVjRvTFdwWmphNUhHcWx4T0JzV09DRTVKQVZvZmRxdnp2RmRkCjJKR0hjZ2ZZajY4MnlsMEUvRVF5Y0Q2b3FJa3Jmb1drODRVaWFLVzMvRy9ETHVJbi9UOD0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    server: https://api.kiwidev.xyz
+  name: kiwidev.xyz
+contexts:
+- context:
+    cluster: kiwidev.xyz
+    user: kiwidev.xyz
+  name: kiwidev.xyz
+current-context: kiwidev.xyz
+kind: Config
+preferences: {}
+users:
+- name: kiwidev.xyz
+  user:
+    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURKakNDQWc2Z0F3SUJBZ0lSQUl0TUFKV1JGaGl5NXgwZEhUQ09GWkl3RFFZSktvWklodmNOQVFFTEJRQXcKRlRFVE1CRUdBMVVFQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TVRFd01UY3dPVEl6TVRKYUZ3MHlNVEV3TWpBdwpNekl6TVRKYU1EQXhGekFWQmdOVkJBb1REbk41YzNSbGJUcHRZWE4wWlhKek1SVXdFd1lEVlFRREV3eHJkV0psClkyWm5MWEp2YjNRd2dnRWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURQNi96V1ZBcGkKaHdnbzRreU5MTFRoSXFEUDFUdTJYU0pVN042aCtLMTVPbFFJaGFGcm1WcjEvRmNHVjd3czErN1YxRUY4aXBlMQpYRUtGVXY0U3R3Ykx5eUtVQS9JZExpQlBJdUY0c0xJVHB2SzVHZldtM2VaYW9hNm9PbGxxV3A2UVo4STlzWURRClFsSFNjb0c4T0w3Tk1WR0pPaWdTVWlOVnhDWUN5d0RhVDhRWWZ4T0RkNjJGVzhOZ2NKNHh4L2s1VWZqV1Z5U0kKTnhJeWRYSFhxYk1rUUFyL3hma0hhQ3N6ZUQ2b21qU0N0Y1lEaFdqd0ozcnZlQ3JpNXpYbHdKbTB2Z2FjWnc1TApEdEhYY0VpelBjTkx4N0JtMktQQ3plNkVyMXBzU2NXVzdNdGQ4TEpqWHVUUlZxNW5tSGUrM3h1K3B1SCswckJICk10OHhaZ09PSXUrRkFnTUJBQUdqVmpCVU1BNEdBMVVkRHdFQi93UUVBd0lIZ0RBVEJnTlZIU1VFRERBS0JnZ3IKQmdFRkJRY0RBakFNQmdOVkhSTUJBZjhFQWpBQU1COEdBMVVkSXdRWU1CYUFGQTVOYzlTNmhTY2VtS1hRYjdhRQo5NDUvYmlkUk1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQWpPWnR5VXVVQ0RYaFNvLzErb3ZULzNWRVIrUzE0CmgvWmFBOGNwbm45bUo2d0tGNE9wOEtIQlZoeXc4Y0VkdzhRQjVlZXBnMi9OenNjR1JscGt6TTBZZU1QN1JWV1UKWUJFK2RQblhpUGRpY2E2OWZPa0VucW1YK1RIaDhBc3Z2N1NNb1FIY2pxQXNta3ZjSTRQZlpEWTd6Wk4rQkZhNApEUCtpV3htYkEzcUlIbFhTWm02amZWMWlpTkhmN1lTR25JVVZQK1B6K0NBMU1yR1c0MFdZNlV6Q0swRUhZWWZTClQrTjA3UlNOTjl6MDF3WmgzQWxpcDc3MzVQVDVobHNGMlEvSCtxMTBDeEtvTW5sdEZZTXlVTzJhMW5hanZkQVcKYURlR2o4MUFJSTdTanRXMW4wSEd6VSt4VlFHemJLK0tpekNWQVJXOWViMWhGRXdmZWJrYjkwcUYKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBeit2ODFsUUtZb2NJS09KTWpTeTA0U0tnejlVN3RsMGlWT3plb2ZpdGVUcFVDSVdoCmE1bGE5ZnhYQmxlOExOZnUxZFJCZklxWHRWeENoVkwrRXJjR3k4c2lsQVB5SFM0Z1R5TGhlTEN5RTZieXVSbjEKcHQzbVdxR3VxRHBaYWxxZWtHZkNQYkdBMEVKUjBuS0J2RGkrelRGUmlUb29FbElqVmNRbUFzc0Eyay9FR0g4VApnM2V0aFZ2RFlIQ2VNY2Y1T1ZINDFsY2tpRGNTTW5WeDE2bXpKRUFLLzhYNUIyZ3JNM2crcUpvMGdyWEdBNFZvCjhDZDY3M2dxNHVjMTVjQ1p0TDRHbkdjT1N3N1IxM0JJc3ozRFM4ZXdadGlqd3MzdWhLOWFiRW5GbHV6TFhmQ3kKWTE3azBWYXVaNWgzdnQ4YnZxYmgvdEt3UnpMZk1XWURqaUx2aFFJREFRQUJBb0lCQUNRU2d4a0VGNUVrY0N2MwpwdVJQUDBwWDRhSnRFaUQvWTNkc2FPdWM0eXZIRE5FMXJkMm5DM3Jsdm90aEtVcDJZLzlCQmVOL2YvWjgvU1Y0ClVwQVlwTnN5Y050UkcrNG9GSDdtUkV2V0MrOFE1Y2RyVTQwUnJtZEc2YkJSL3pWT1ozZ1NLRWJmeHNOYTNpc3UKcG9kcktOOGNrVkxIZmpBL2c5WGJZK1RVSjErNGFyblRlYlFEbjQzUlp6M0VxOUJRN0lvdU0rQ056ejAwQUo4QQphQ3p1THUrWWd3VHFhWWdtdXlPaG4rTmRUSGNJNHJIOHRyTDZ0Q20xNTVrK0xCNWJma2xQcFhFSzR0U291QnVJCjBsY3ZzUS9RMVJpU1Zkby9xMEpNbk5SRnhzYWRMR1FvL2ptbmlOajg4VGxSRkZjRFlPNnRtdVlaa1g2QUVZeTEKU1l6S1dEa0NnWUVBMWN0Y0p0dGRuUFZSN21pUC9QWjViR2U5bSszcW9MZUZzZjc2NnhzQWs2Z0FJZ2dBODRQSQppclpaMCtMaEZ1SWJDajN6cE5QUmlVUkZzSzFhbFAxRUM4a0tWS3YzOUlSUWpYRjU3VEhnU3hMSmVWWk1acXNyCnJvdlZTdzk3MHJBS1Z1U2RySS9VeFNIUmhpTmRvQlRMcTlTTXdSK2Mra3h4RVFpenVJUldKamNDZ1lFQStQZlgKOVhMN0RGZWphSFoyQVo3TzZkOVhuWGNMSGpQMU1qTzV4Si9KcnVuU2JTVm1DcUtOeEFLSEg5MG9UUEo4S2VXOApGRnpKeUZJMi92cW5lelNZNk1aVDhWTzRNRUhIQitxT20vMCtlNXhzWW9oak5MK2NBRzh5RWQxRGdDZVlUOG54CmVqZGcwYm0vTW51UTIrVXBvM2t5b25vbWRGNDlhZWNvWnk1RytpTUNnWUIwK1BQdGFwNVlienlwbFZvYWpIdzQKM0xXNEo3NzB1aFNUSTdBRGpGMlBiQjdPZjlTTlo3QUVmT3ErN0dZOUQrNjlkdEhrZitRb0YwdU44L3NZZzAyRQpxVFZXeUZRODIxdjdWM2ZmV0NlZ3k2R2lHcDVvbWdTblZtaVh6ZHZ3bFZMQzRnaUd6cGNhV0h0N3ljUEMvejNFClFPSFdGRWJlQjQ3aFJBS1kxUWNSbHdLQmdRQ3BCeXRaZXR5eWZuVjBvS2h4WlM0NVhlYVFBNWhLd3grL0c1c04Kd1NZZVdLVUNjUmVjTk14bXZRaWNPM3YyOGRJV1orQ1BPb2ZNTnZVYm0zVkZrbW9WNzBCaVlXSjFjTkw5cnVOdgpTRG01bG5PSFdlMXdqSDRQVlc3NjdldThBQ1hLVmVKYUJXcjRPRkYwcHF1c2Z5TUwxMmJuSkdNak1qQWp6RXFECjhzbEJYUUtCZ1FDbHYySi9WMkZLNHNQa1V3bFpBeHMyYit2dWljUW9KNElwK0ljRlM2b2R5NHFXSzcxVkl5TzgKSkpXa2pvSWs5dXdVTFEwUnE1KzdkMGRqazZUS3d1bGIyZTJoazBhS1l3dEZoNm0yZm9TUHZiK1pKRHI2MGN5VgpZMTFKMm5OWm9LdVYwdVNkMG9xUFZSL0J2aDErcFcrT0k5QzVPMDV0ZXdsc054eXlWQzQ5YlE9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+
+
+watch some scenes in video
+
+
+
+
+
+
+
+
+
+pipeline {
+    environment {
+        registry = 'sreeharshav/k8sjenkins'
+        registryCredential = 'dockerhub_id'
+        dockerImage = ''
+    }
+    agent any
+    stages {
+        stage('Cloning our Git') {
+            steps {
+                git 'https://github.com/mavrick202/dockertest1.git'
+            }
+        }
+        stage('Building our image') {
+            steps {
+                script {
+                    dockerImage = docker.build registry + ":v$BUILD_NUMBER"
+                }
+            }
+        }
+        stage('Pushing Image to DockerHub') {
+            steps {
+                script {
+                    docker.withRegistry( '', registryCredential ) {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+        stage('Cleaning up') {
+            steps {
+                sh "docker rmi $registry:v$BUILD_NUMBER"
+            }
+        }
+        stage('Deploying To K8S') {
+            steps {
+                sh 'ls -al'
+                sh 'kubectl apply -f k8sdeploy.yml'
+                sh "kubectl set image deployment/nginx-deployment nginx=$registry:v$BUILD_NUMBER --record"
+            }
+        }
+    }
+}
+
+
+
+
+
+
+

@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-prod
+  labels:
+    env: prod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  nodeSelector:
+    env: prod
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-dev
+  labels:
+    env: dev
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  nodeSelector:
+    env: dev
+
+
+root@ip-172-31-8-33:~# kubectl get nodes
+NAME                                           STATUS   ROLES                  AGE     VERSION
+ip-172-20-47-24.ap-south-1.compute.internal    Ready    control-plane,master   4m28s   v1.20.11
+ip-172-20-54-140.ap-south-1.compute.internal   Ready    node                   2m40s   v1.20.11
+ip-172-20-58-17.ap-south-1.compute.internal    Ready    node                   2m29s   v1.20.11
+ip-172-20-76-46.ap-south-1.compute.internal    Ready    node                   2m40s   v1.20.11
+ip-172-20-94-139.ap-south-1.compute.internal   Ready    node                   2m39s   v1.20.11
+
+
+prod:
+ip-172-20-54-140.ap-south-1.compute.internal
+ip-172-20-58-17.ap-south-1.compute.internal
+
+dev:
+ip-172-20-76-46.ap-south-1.compute.internal
+ip-172-20-94-139.ap-south-1.compute.internal
+
+
+#################TAINTS-TOLERATIONS################################
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    env: prod
+  "name: prod-deploy
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      env: prod
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        env: dev
+    spec:
+      containers:
+      - image: sreeharshav/rollingupdate:v3
+        imagePullPolicy: IfNotPresent
+        name: prodpod
+        resources: {}
+
+
