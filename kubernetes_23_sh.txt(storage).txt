@@ -42,6 +42,7 @@ root@ip-172-31-40-54:~# echo 'apiVersion: v1
 pod/mypod created
 
 
+deploy this below pod
 
 apiVersion: v1
 kind: Pod
